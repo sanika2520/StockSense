@@ -69,6 +69,19 @@ interface ProductCatalog {
     };
 }
 
+type ScopeType = 'sku' | 'category';
+type EdgeOperation = 'set' | 'multiply' | 'add';
+type GraphScopeMode = 'all' | 'category' | 'sku';
+
+interface EdgeWeightUpdateResponse {
+    success: boolean;
+    dry_run: boolean;
+    changed_edges: number;
+    unchanged_edges: number;
+    total_candidate_edges: number;
+    message: string;
+}
+
 // Category color mapping
 const CATEGORY_COLORS: Record<string, string> = {
     'GROC': '#4ade80', 'FRPR': '#22c55e', 'BEVG': '#60a5fa', 'BKDY': '#f59e0b',
@@ -120,6 +133,17 @@ export default function GNN3DVisualizer() {
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [productCatalog, setProductCatalog] = useState<ProductCatalog>({});
     const [showEdges, setShowEdges] = useState(true);
+    const [graphScopeMode, setGraphScopeMode] = useState<GraphScopeMode>('all');
+    const [graphScopeCategories, setGraphScopeCategories] = useState<string[]>([]);
+    const [graphScopeSKU, setGraphScopeSKU] = useState('');
+    const [sourceScopeType, setSourceScopeType] = useState<ScopeType>('category');
+    const [sourceScopeValue, setSourceScopeValue] = useState('GROC');
+    const [targetScopeType, setTargetScopeType] = useState<ScopeType>('sku');
+    const [targetScopeValue, setTargetScopeValue] = useState('');
+    const [edgeOperation, setEdgeOperation] = useState<EdgeOperation>('set');
+    const [edgeValue, setEdgeValue] = useState('1');
+    const [edgeUpdateLoading, setEdgeUpdateLoading] = useState(false);
+    const [edgeUpdateStatus, setEdgeUpdateStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     useEffect(() => {
         fetchStats();
@@ -148,6 +172,37 @@ export default function GNN3DVisualizer() {
             fetchInfluences(selectedSKU);
         }
     }, [selectedSKU]);
+
+    useEffect(() => {
+        if (!targetScopeValue && selectedSKU) {
+            setTargetScopeValue(selectedSKU);
+        }
+    }, [selectedSKU, targetScopeValue]);
+
+    useEffect(() => {
+        if (!graphScopeSKU && selectedSKU) {
+            setGraphScopeSKU(selectedSKU);
+        }
+    }, [selectedSKU, graphScopeSKU]);
+
+    useEffect(() => {
+        if (!graphData?.nodes?.length) return;
+
+        const categories = Array.from(new Set(graphData.nodes.map((n) => n.category))).sort();
+        if (graphScopeCategories.length === 0 && categories.length > 0) {
+            setGraphScopeCategories([categories[0]]);
+        }
+
+        const validSelectedCategories = graphScopeCategories.filter((cat) => categories.includes(cat));
+        if (validSelectedCategories.length !== graphScopeCategories.length) {
+            setGraphScopeCategories(validSelectedCategories.length > 0 ? validSelectedCategories : categories.slice(0, 1));
+        }
+
+        const skus = graphData.nodes.map((n) => n.id);
+        if (graphScopeSKU && !skus.includes(graphScopeSKU) && skus.length > 0) {
+            setGraphScopeSKU(skus[0]);
+        }
+    }, [graphData, graphScopeCategories, graphScopeSKU]);
 
     const fetchStats = async () => {
         try {
@@ -211,6 +266,67 @@ export default function GNN3DVisualizer() {
         }
     };
 
+    const applyEdgeWeightUpdate = async (dryRun: boolean) => {
+        const parsedValue = Number(edgeValue);
+        if (!Number.isFinite(parsedValue)) {
+            setEdgeUpdateStatus({ type: 'error', message: 'Edge value must be a valid number.' });
+            return;
+        }
+
+        if (!sourceScopeValue.trim() || !targetScopeValue.trim()) {
+            setEdgeUpdateStatus({ type: 'error', message: 'Source and target scope values are required.' });
+            return;
+        }
+
+        setEdgeUpdateLoading(true);
+        setEdgeUpdateStatus(null);
+
+        try {
+            const response = await fetch(`${API_URL}/gnn/edge-weights/bulk-update`, {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    source_scope_type: sourceScopeType,
+                    source_scope_value: sourceScopeValue.trim(),
+                    target_scope_type: targetScopeType,
+                    target_scope_value: targetScopeValue.trim(),
+                    operation: edgeOperation,
+                    value: parsedValue,
+                    dry_run: dryRun,
+                }),
+            });
+
+            const data: EdgeWeightUpdateResponse & { detail?: string } = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to update edge weights');
+            }
+
+            setEdgeUpdateStatus({
+                type: 'success',
+                message: `${data.message}. Changed ${data.changed_edges}/${data.total_candidate_edges} candidate edges.`,
+            });
+
+            if (!dryRun) {
+                await Promise.all([
+                    fetchGraphPreview(),
+                    fetchStats(),
+                    selectedSKU ? fetchInfluences(selectedSKU) : Promise.resolve(),
+                ]);
+            }
+        } catch (error) {
+            console.error('Error updating edge weights:', error);
+            setEdgeUpdateStatus({
+                type: 'error',
+                message: error instanceof Error ? error.message : 'Failed to update edge weights.',
+            });
+        } finally {
+            setEdgeUpdateLoading(false);
+        }
+    };
+
     const getNodeColor = (node: GraphNode) => {
         return CATEGORY_COLORS[node.category] || '#64748b';
     };
@@ -252,6 +368,39 @@ export default function GNN3DVisualizer() {
         const matchesCategory = categoryFilter === 'all' || node.category === categoryFilter;
         return matchesSearch && matchesCategory;
     }) || [];
+
+    const categoryOptions = Array.from(new Set((graphData?.nodes || []).map((n) => n.category))).sort();
+    const skuOptions = (graphData?.nodes || []).map((n) => n.id);
+
+    const sourceScopeOptions = sourceScopeType === 'sku' ? skuOptions : categoryOptions;
+    const targetScopeOptions = targetScopeType === 'sku' ? skuOptions : categoryOptions;
+
+    const visibleNodeIds = new Set(
+        (graphData?.nodes || [])
+            .filter((node) => {
+                if (graphScopeMode === 'all') return true;
+                if (graphScopeMode === 'category') {
+                    return graphScopeCategories.length > 0 ? graphScopeCategories.includes(node.category) : true;
+                }
+                return graphScopeSKU ? node.id === graphScopeSKU : true;
+            })
+            .map((node) => node.id)
+    );
+
+    const toggleGraphScopeCategory = (category: string) => {
+        setGraphScopeCategories((prev) => {
+            if (prev.includes(category)) {
+                if (prev.length === 1) return prev;
+                return prev.filter((cat) => cat !== category);
+            }
+            return [...prev, category];
+        });
+    };
+
+    const filtered3DNodes = (graphData?.nodes || []).filter((node) => visibleNodeIds.has(node.id));
+    const filtered3DEdges = (graphData?.edges || []).filter(
+        (edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+    );
 
     return (
         <div className="space-y-6">
@@ -344,7 +493,7 @@ export default function GNN3DVisualizer() {
                     <Card glass>
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-4 flex-wrap">
                                     <label className="flex items-center gap-2 text-sm">
                                         <input
                                             type="checkbox"
@@ -354,6 +503,47 @@ export default function GNN3DVisualizer() {
                                         />
                                         <span>Show Edges</span>
                                     </label>
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className="text-muted">View Scope</span>
+                                        <select
+                                            value={graphScopeMode}
+                                            onChange={(e) => setGraphScopeMode(e.target.value as GraphScopeMode)}
+                                            className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-1.5 px-2 text-xs focus:ring-1 focus:ring-info outline-none"
+                                        >
+                                            <option value="all">All SKUs</option>
+                                            <option value="category">Category</option>
+                                            <option value="sku">Single SKU</option>
+                                        </select>
+                                    </div>
+                                    {graphScopeMode === 'category' && (
+                                        <div className="flex items-center gap-1.5 flex-wrap max-w-[540px]">
+                                            {categoryOptions.map((cat) => {
+                                                const selected = graphScopeCategories.includes(cat);
+                                                return (
+                                                    <button
+                                                        key={cat}
+                                                        type="button"
+                                                        onClick={() => toggleGraphScopeCategory(cat)}
+                                                        className={`px-2 py-1 rounded-md text-xs border transition-colors ${selected ? 'bg-info/20 border-info/40 text-info' : 'bg-white/5 border-white/10 text-muted hover:text-foreground'}`}
+                                                    >
+                                                        {CATEGORY_NAMES[cat] || cat}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    {graphScopeMode === 'sku' && (
+                                        <select
+                                            value={graphScopeSKU}
+                                            onChange={(e) => setGraphScopeSKU(e.target.value)}
+                                            className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-1.5 px-2 text-xs focus:ring-1 focus:ring-info outline-none max-w-[220px]"
+                                        >
+                                            {skuOptions.map((sku) => (
+                                                <option key={sku} value={sku}>{sku}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    <Badge variant="info">Visible: {filtered3DNodes.length}</Badge>
                                 </div>
                                 <div className="flex gap-4 text-xs">
                                     <div className="flex items-center gap-2">
@@ -401,12 +591,12 @@ export default function GNN3DVisualizer() {
                                     <ForceGraph3D
                                         ref={fgRef}
                                         graphData={{
-                                            nodes: graphData.nodes.map(node => ({
+                                            nodes: filtered3DNodes.map(node => ({
                                                 ...node,
                                                 color: getNodeColor(node),
                                                 val: getNodeSize(node)
                                             })),
-                                            links: showEdges ? graphData.edges.map(edge => ({
+                                            links: showEdges ? filtered3DEdges.map(edge => ({
                                                 source: edge.source,
                                                 target: edge.target,
                                                 value: edge.weight,
@@ -426,7 +616,13 @@ export default function GNN3DVisualizer() {
                                         linkOpacity={0.6}
                                         backgroundColor="rgba(0,0,0,0)"
                                         showNavInfo={false}
-                                        onNodeClick={(node: unknown) => setSelectedSKU((node as { id: string }).id)}
+                                        onNodeClick={(node: unknown) => {
+                                            const clickedSku = (node as { id: string }).id;
+                                            setSelectedSKU(clickedSku);
+                                            if (graphScopeMode === 'sku') {
+                                                setGraphScopeSKU(clickedSku);
+                                            }
+                                        }}
                                     />
                                 ) : (
                                     <div className="flex items-center justify-center h-full text-muted">No graph data available</div>
@@ -441,42 +637,148 @@ export default function GNN3DVisualizer() {
             {view === 'explorer' && (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div className="lg:col-span-1">
-                        <Card glass>
-                            <CardHeader>
-                                <CardTitle className="text-lg">Filters</CardTitle>
-                                <CardDescription>Search and narrow down SKUs</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-xs text-muted block mb-1">Search</label>
-                                        <div className="relative">
-                                            <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                                            <input
-                                                type="text"
-                                                value={searchFilter}
-                                                onChange={(e) => setSearchFilter(e.target.value)}
-                                                placeholder="SKU or name..."
-                                                className="w-full !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-info outline-none shadow-inner"
-                                            />
+                        <div className="space-y-6">
+                            <Card glass>
+                                <CardHeader>
+                                    <CardTitle className="text-lg">Filters</CardTitle>
+                                    <CardDescription>Search and narrow down SKUs</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs text-muted block mb-1">Search</label>
+                                            <div className="relative">
+                                                <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                                                <input
+                                                    type="text"
+                                                    value={searchFilter}
+                                                    onChange={(e) => setSearchFilter(e.target.value)}
+                                                    placeholder="SKU or name..."
+                                                    className="w-full !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm focus:ring-1 focus:ring-info outline-none shadow-inner"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-muted block mb-1">Category</label>
+                                            <select
+                                                value={categoryFilter}
+                                                onChange={(e) => setCategoryFilter(e.target.value)}
+                                                className="w-full !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-3 text-sm focus:ring-1 focus:ring-info outline-none"
+                                            >
+                                                <option value="all">All Categories</option>
+                                                {Object.keys(CATEGORY_NAMES).map(code => (
+                                                    <option key={code} value={code}>{CATEGORY_NAMES[code]}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs text-muted block mb-1">Category</label>
-                                        <select
-                                            value={categoryFilter}
-                                            onChange={(e) => setCategoryFilter(e.target.value)}
-                                            className="w-full !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-3 text-sm focus:ring-1 focus:ring-info outline-none"
-                                        >
-                                            <option value="all">All Categories</option>
-                                            {Object.keys(CATEGORY_NAMES).map(code => (
-                                                <option key={code} value={code}>{CATEGORY_NAMES[code]}</option>
-                                            ))}
-                                        </select>
+                                </CardContent>
+                            </Card>
+
+                            <Card glass>
+                                <CardHeader>
+                                    <CardTitle className="text-lg">Edge Weight Editor</CardTitle>
+                                    <CardDescription>Update SKU or category links relative to SKU/category targets</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs text-muted block mb-1">Source Scope</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <select
+                                                    value={sourceScopeType}
+                                                    onChange={(e) => setSourceScopeType(e.target.value as ScopeType)}
+                                                    className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-2 text-sm focus:ring-1 focus:ring-info outline-none"
+                                                >
+                                                    <option value="sku">SKU</option>
+                                                    <option value="category">Category</option>
+                                                </select>
+                                                <select
+                                                    value={sourceScopeValue}
+                                                    onChange={(e) => setSourceScopeValue(e.target.value)}
+                                                    className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-2 text-sm focus:ring-1 focus:ring-info outline-none"
+                                                >
+                                                    {sourceScopeOptions.map((opt) => (
+                                                        <option key={opt} value={opt}>{opt}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-muted block mb-1">Target Scope</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <select
+                                                    value={targetScopeType}
+                                                    onChange={(e) => setTargetScopeType(e.target.value as ScopeType)}
+                                                    className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-2 text-sm focus:ring-1 focus:ring-info outline-none"
+                                                >
+                                                    <option value="sku">SKU</option>
+                                                    <option value="category">Category</option>
+                                                </select>
+                                                <select
+                                                    value={targetScopeValue}
+                                                    onChange={(e) => setTargetScopeValue(e.target.value)}
+                                                    className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-2 text-sm focus:ring-1 focus:ring-info outline-none"
+                                                >
+                                                    {targetScopeOptions.map((opt) => (
+                                                        <option key={opt} value={opt}>{opt}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-muted block mb-1">Operation</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <select
+                                                    value={edgeOperation}
+                                                    onChange={(e) => setEdgeOperation(e.target.value as EdgeOperation)}
+                                                    className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-2 text-sm focus:ring-1 focus:ring-info outline-none"
+                                                >
+                                                    <option value="set">Set</option>
+                                                    <option value="multiply">Multiply</option>
+                                                    <option value="add">Add</option>
+                                                </select>
+                                                <input
+                                                    type="number"
+                                                    value={edgeValue}
+                                                    onChange={(e) => setEdgeValue(e.target.value)}
+                                                    step="0.01"
+                                                    className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-2 text-sm focus:ring-1 focus:ring-info outline-none"
+                                                    placeholder="Value"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => applyEdgeWeightUpdate(true)}
+                                                disabled={edgeUpdateLoading}
+                                            >
+                                                Preview
+                                            </Button>
+                                            <Button
+                                                variant="primary"
+                                                size="sm"
+                                                onClick={() => applyEdgeWeightUpdate(false)}
+                                                disabled={edgeUpdateLoading}
+                                            >
+                                                Apply
+                                            </Button>
+                                        </div>
+
+                                        {edgeUpdateStatus && (
+                                            <div className={`text-xs rounded-lg px-3 py-2 border ${edgeUpdateStatus.type === 'success' ? 'bg-success/10 border-success/30 text-success' : 'bg-error/10 border-error/30 text-error'}`}>
+                                                {edgeUpdateStatus.message}
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
 
                     <div className="lg:col-span-3">

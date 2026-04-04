@@ -33,6 +33,7 @@ interface User {
     name?: string;
     email: string;
     role: string;
+    store_id?: string | null;
 }
 
 interface ModelMetric {
@@ -319,8 +320,12 @@ export default function AnalystDashboard() {
         setSimulationLoading(true);
         try {
             // POST /simulations/custom?scenario_text=... → AI + GNN powered analysis
+            const params = new URLSearchParams({ scenario_text: customScenario });
+            if (user?.store_id) {
+                params.set('store_id', user.store_id.toUpperCase());
+            }
             const response = await fetch(
-                `${API_URL}/simulations/custom?scenario_text=${encodeURIComponent(customScenario)}`,
+                `${API_URL}/simulations/custom?${params.toString()}`,
                 {
                     method: 'POST',
                     headers: getAuthHeaders(),

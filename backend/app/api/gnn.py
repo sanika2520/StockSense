@@ -9,10 +9,11 @@ Provides endpoints for:
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Literal, Set, Tuple
 from pathlib import Path
 import json
 import random
+from pydantic import BaseModel, Field
 
 try:
     import torch
@@ -26,6 +27,52 @@ router = APIRouter(prefix="/gnn", tags=["GNN"])
 ML_DIR = Path(__file__).parent.parent.parent.parent / "ml"
 MODELS_DIR = ML_DIR / "models" / "gnn"
 DATA_DIR = ML_DIR / "data" / "raw"
+
+
+class EdgeWeightBulkUpdateRequest(BaseModel):
+    source_scope_type: Literal["sku", "category"]
+    source_scope_value: str = Field(..., min_length=1)
+    target_scope_type: Literal["sku", "category"]
+    target_scope_value: str = Field(..., min_length=1)
+    operation: Literal["set", "multiply", "add"] = "set"
+    value: float
+    min_clip: Optional[float] = 0.0
+    max_clip: Optional[float] = 5.0
+    exclude_self: bool = True
+    dry_run: bool = False
+
+
+def _resolve_scope_indices(
+    scope_type: str,
+    scope_value: str,
+    sku_to_idx: Dict[str, int],
+    idx_to_sku: Dict[int, str],
+) -> Set[int]:
+    """Resolve SKU/category scope into graph node indices."""
+    if scope_type == "sku":
+        sku = scope_value.strip().upper()
+        if sku not in sku_to_idx:
+            raise HTTPException(status_code=404, detail=f"SKU {sku} not found in graph")
+        return {int(sku_to_idx[sku])}
+
+    category = scope_value.strip().upper()
+    matched_indices: Set[int] = set()
+    for idx, sku in idx_to_sku.items():
+        if get_product_category(sku).upper() == category:
+            matched_indices.add(int(idx))
+
+    if not matched_indices:
+        raise HTTPException(status_code=404, detail=f"Category {category} not found in graph")
+
+    return matched_indices
+
+
+def _compute_updated_weight(old_weight: float, operation: str, value: float) -> float:
+    if operation == "set":
+        return value
+    if operation == "multiply":
+        return old_weight * value
+    return old_weight + value
 
 
 def load_graph_data():
@@ -309,4 +356,125 @@ def get_graph_statistics():
             "max": round(max_weight, 3)
         },
         "metadata": metadata
+    }
+
+
+@router.post("/edge-weights/bulk-update")
+def bulk_update_edge_weights(request: EdgeWeightBulkUpdateRequest):
+    """
+    Bulk update edge weights between SKU/category scopes.
+
+    Supports:
+    - sku -> sku
+    - sku -> category
+    - category -> sku
+    - category -> category
+    """
+    graph_data = load_graph_data()
+
+    if not graph_data:
+        raise HTTPException(status_code=404, detail="GNN graph data not found")
+
+    adjacency = graph_data["adjacency"]
+    sku_to_idx = graph_data["sku_to_idx"]
+    idx_to_sku = graph_data["idx_to_sku"]
+
+    if request.min_clip is not None and request.max_clip is not None and request.min_clip > request.max_clip:
+        raise HTTPException(status_code=400, detail="min_clip cannot be greater than max_clip")
+
+    source_indices = _resolve_scope_indices(
+        request.source_scope_type,
+        request.source_scope_value,
+        sku_to_idx,
+        idx_to_sku,
+    )
+    target_indices = _resolve_scope_indices(
+        request.target_scope_type,
+        request.target_scope_value,
+        sku_to_idx,
+        idx_to_sku,
+    )
+
+    unique_pairs: Set[Tuple[int, int]] = set()
+    for src_idx in source_indices:
+        for tgt_idx in target_indices:
+            if request.exclude_self and src_idx == tgt_idx:
+                continue
+            i, j = (src_idx, tgt_idx) if src_idx <= tgt_idx else (tgt_idx, src_idx)
+            unique_pairs.add((i, j))
+
+    if not unique_pairs:
+        raise HTTPException(status_code=400, detail="No edges matched the requested update scope")
+
+    changed = 0
+    unchanged = 0
+    sample_updates = []
+
+    for i, j in sorted(unique_pairs):
+        old_weight = float(adjacency[i, j])
+        new_weight = _compute_updated_weight(old_weight, request.operation, request.value)
+
+        if request.min_clip is not None:
+            new_weight = max(request.min_clip, new_weight)
+        if request.max_clip is not None:
+            new_weight = min(request.max_clip, new_weight)
+
+        if abs(new_weight - old_weight) < 1e-12:
+            unchanged += 1
+            continue
+
+        changed += 1
+        if len(sample_updates) < 10:
+            sample_updates.append({
+                "source": idx_to_sku[i],
+                "target": idx_to_sku[j],
+                "old_weight": round(old_weight, 4),
+                "new_weight": round(float(new_weight), 4),
+            })
+
+        if not request.dry_run:
+            adjacency[i, j] = new_weight
+            adjacency[j, i] = new_weight
+
+    if changed == 0:
+        return {
+            "success": True,
+            "dry_run": request.dry_run,
+            "changed_edges": 0,
+            "unchanged_edges": unchanged,
+            "total_candidate_edges": len(unique_pairs),
+            "message": "No edge weights changed for this request",
+            "sample_updates": sample_updates,
+        }
+
+    if not request.dry_run:
+        try:
+            adjacency_file = MODELS_DIR / "adjacency.pt"
+            torch.save(adjacency, adjacency_file)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to persist adjacency matrix: {e}")
+
+    return {
+        "success": True,
+        "dry_run": request.dry_run,
+        "changed_edges": changed,
+        "unchanged_edges": unchanged,
+        "total_candidate_edges": len(unique_pairs),
+        "source_scope": {
+            "type": request.source_scope_type,
+            "value": request.source_scope_value.strip().upper(),
+            "resolved_nodes": len(source_indices),
+        },
+        "target_scope": {
+            "type": request.target_scope_type,
+            "value": request.target_scope_value.strip().upper(),
+            "resolved_nodes": len(target_indices),
+        },
+        "operation": request.operation,
+        "value": request.value,
+        "sample_updates": sample_updates,
+        "message": (
+            "Preview complete" if request.dry_run
+            else "Edge weights updated and saved"
+        ),
     }

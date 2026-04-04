@@ -9,6 +9,14 @@ interface InventoryStoreSummary {
   value: number;
 }
 
+interface ForecastOption {
+  sku: string;
+  product_name: string;
+  category: string;
+  current_stock: number;
+  seven_day_forecast: number;
+}
+
 interface RebalancingPlan {
   id: number;
   sku: string;
@@ -31,6 +39,7 @@ interface RebalancingWorkflowModalProps {
   showModal: boolean;
   setShowModal: (show: boolean) => void;
   inventoryByStore: InventoryStoreSummary[];
+  forecasts: ForecastOption[];
   userStore: string | null;
   selectedStore: string;
   apiUrl: string;
@@ -48,13 +57,15 @@ const RebalancingWorkflowModal: React.FC<RebalancingWorkflowModalProps> = ({
   showModal,
   setShowModal,
   inventoryByStore,
+  forecasts,
   userStore,
   selectedStore,
   apiUrl,
   getAuthHeaders,
   onPlanCreated,
 }) => {
-  const [sku, setSku] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSku, setSelectedSku] = useState('');
   const [fromStore, setFromStore] = useState('S1');
   const [toStore, setToStore] = useState('S2');
   const [quantity, setQuantity] = useState<number>(20);
@@ -80,6 +91,42 @@ const RebalancingWorkflowModal: React.FC<RebalancingWorkflowModalProps> = ({
     if (fromData.length > 0) return fromData;
     return canonical;
   }, [inventoryByStore]);
+
+  const normalizedForecasts = useMemo(() => {
+    const bySku = new Map<string, ForecastOption>();
+
+    for (const row of forecasts) {
+      const sku = String(row.sku || '').trim();
+      if (!sku) continue;
+
+      const category = String(row.category || '').trim() || 'Uncategorized';
+      const productName = String(row.product_name || '').trim() || sku;
+
+      if (!bySku.has(sku)) {
+        bySku.set(sku, {
+          ...row,
+          sku,
+          category,
+          product_name: productName,
+        });
+      }
+    }
+
+    return Array.from(bySku.values()).sort((a, b) => {
+      const categoryDiff = a.category.localeCompare(b.category);
+      if (categoryDiff !== 0) return categoryDiff;
+      return a.product_name.localeCompare(b.product_name);
+    });
+  }, [forecasts]);
+
+  const categories = useMemo(() => {
+    return Array.from(new Set(normalizedForecasts.map((f) => f.category))).sort();
+  }, [normalizedForecasts]);
+
+  const skuOptions = useMemo(() => {
+    if (!selectedCategory) return [];
+    return normalizedForecasts.filter((f) => f.category === selectedCategory);
+  }, [normalizedForecasts, selectedCategory]);
 
   const storeMetrics = useMemo(() => {
     const metrics = new Map<string, { pressure: number; capacity: number; value: number }>();
@@ -173,9 +220,23 @@ const RebalancingWorkflowModal: React.FC<RebalancingWorkflowModalProps> = ({
 
     setFromStore(defaultFrom);
     setToStore(fallbackTarget);
+    setSelectedCategory('');
+    setSelectedSku('');
     setQuantity(20);
     fetchRecentPlans();
   }, [showModal, userStore, selectedStore, stores]);
+
+  useEffect(() => {
+    setSelectedSku('');
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    if (!selectedSku) return;
+    const selected = normalizedForecasts.find((f) => f.sku === selectedSku);
+    if (!selected) return;
+    const suggestedQty = Math.max(1, Math.ceil(selected.seven_day_forecast - selected.current_stock + 20));
+    setQuantity(suggestedQty);
+  }, [selectedSku, normalizedForecasts]);
 
   const useSuggestion = (lane: LaneSuggestion) => {
     if (userStore && lane.from !== userStore) {
@@ -233,7 +294,7 @@ const RebalancingWorkflowModal: React.FC<RebalancingWorkflowModalProps> = ({
     setWarning('');
     setSuccess('');
 
-    if (!sku.trim()) {
+    if (!selectedSku.trim()) {
       setError('SKU is required.');
       return;
     }
@@ -257,7 +318,7 @@ const RebalancingWorkflowModal: React.FC<RebalancingWorkflowModalProps> = ({
           ...getAuthHeaders(),
         },
         body: JSON.stringify({
-          sku: sku.trim(),
+          sku: selectedSku.trim(),
           from_store: fromStore,
           to_store: toStore,
           quantity,
@@ -296,7 +357,7 @@ const RebalancingWorkflowModal: React.FC<RebalancingWorkflowModalProps> = ({
         }
       }
 
-      setSku('');
+      setSelectedSku('');
       await fetchRecentPlans();
       if (onPlanCreated) {
         await onPlanCreated();
@@ -432,14 +493,35 @@ const RebalancingWorkflowModal: React.FC<RebalancingWorkflowModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="text-xs text-muted block mb-1">SKU</label>
-                  <input
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value)}
-                    placeholder="e.g., SKU_FRPR002"
+                  <label className="text-xs text-muted block mb-1">Category</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
                     className="w-full px-3 py-2 bg-surface-elevated border border-white/10 rounded-lg text-sm"
-                  />
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
                 </div>
+                <div>
+                  <label className="text-xs text-muted block mb-1">SKU</label>
+                  <select
+                    value={selectedSku}
+                    onChange={(e) => setSelectedSku(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface-elevated border border-white/10 rounded-lg text-sm disabled:opacity-50"
+                    disabled={!selectedCategory}
+                  >
+                    <option value="">Select SKU</option>
+                    {skuOptions.map((item) => (
+                      <option key={item.sku} value={item.sku}>{item.sku} - {item.product_name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="text-xs text-muted block mb-1">Quantity</label>
                   <input
@@ -450,9 +532,6 @@ const RebalancingWorkflowModal: React.FC<RebalancingWorkflowModalProps> = ({
                     className="w-full px-3 py-2 bg-surface-elevated border border-white/10 rounded-lg text-sm"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="text-xs text-muted block mb-1">From Store</label>
                   <select

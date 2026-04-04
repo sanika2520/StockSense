@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Card, { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import { ChartIcon, SearchIcon, CheckIcon, CalendarIcon, DatabaseIcon } from '@/components/ui/Icons';
@@ -17,35 +17,46 @@ interface DataPoint {
     [key: string]: number | string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+interface ComparisonApiPoint {
+    date: string;
+    store_id: string;
+    product_id: string;
+    demand: number;
+}
 
-// --- Mock Data Generators ---
-const generateMockHistory = (products: Product[], startDate: string, endDate: string, storeId: string) => {
-    const data: DataPoint[] = [];
+interface ComparisonApiResponse {
+    start_date: string;
+    end_date: string;
+    points: ComparisonApiPoint[];
+    data_source: string;
+}
+
+interface StoreOption {
+    id: string;
+    label: string;
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const STORE_OPTIONS: StoreOption[] = [
+    { id: 'S1', label: 'Store S1 (Downtown)' },
+    { id: 'S2', label: 'Store S2 (Westside)' },
+    { id: 'S3', label: 'Store S3 (Airport)' },
+];
+
+const buildDateRange = (startDate: string, endDate: string) => {
+    const result: string[] = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // Safety check for date loop
-    if (start > end) return [];
+    if (start > end) return result;
 
-    const current = new Date(start);
-    while (current <= end) {
-        const dateStr = current.toISOString().split('T')[0];
-        const point: DataPoint = { date: dateStr };
-
-        products.forEach(p => {
-            // Seed based on SKU + Store + Date to be deterministic but varied
-            const seed = p.sku.charCodeAt(p.sku.length - 1) + storeId.charCodeAt(0) + current.getDate();
-            const base = 50 + (seed % 100);
-            const noise = (Math.sin(current.getTime()) * 20);
-
-            point[p.sku] = Math.max(0, Math.round(base + noise));
-        });
-
-        data.push(point);
-        current.setDate(current.getDate() + 1);
+    const cursor = new Date(start);
+    while (cursor <= end) {
+        result.push(cursor.toISOString().split('T')[0]);
+        cursor.setDate(cursor.getDate() + 1);
     }
-    return data;
+
+    return result;
 };
 
 // --- Aggregate Data ---
@@ -119,9 +130,12 @@ const aggregateData = (data: DataPoint[], periodicity: 'daily' | 'weekly' | 'mon
 
 export default function AnalysisView() {
     // --- Filters State ---
+    const [comparisonMode, setComparisonMode] = useState<'products' | 'stores'>('products');
     const [selectedStore, setSelectedStore] = useState('S1');
+    const [selectedCompareStores, setSelectedCompareStores] = useState<string[]>(['S1', 'S2']);
     const [startDate, setStartDate] = useState('2024-01-01');
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedCategory, setSelectedCategory] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
     // --- Data State ---
@@ -129,9 +143,56 @@ export default function AnalysisView() {
     const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
     const [chartData, setChartData] = useState<DataPoint[]>([]);
     const [loading, setLoading] = useState(false);
+    const [uiNotice, setUiNotice] = useState('');
 
     // --- Visualization State ---
     const [chartType, setChartType] = useState<'line' | 'bar' | 'area'>('line');
+
+    const categoryOptions = useMemo(
+        () => Array.from(new Set(products.map(p => p.category).filter(Boolean))),
+        [products]
+    );
+
+    const filteredProducts = useMemo(
+        () => products
+            .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
+            .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase())),
+        [products, selectedCategory, searchQuery]
+    );
+
+    useEffect(() => {
+        const categorySkus = products
+            .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
+            .map(p => p.sku);
+        const categorySkuSet = new Set(categorySkus);
+
+        setSelectedProducts((prev) => {
+            const next = prev.filter((sku) => categorySkuSet.has(sku));
+
+            if (comparisonMode === 'stores' && next.length === 0 && categorySkus.length > 0) {
+                return [categorySkus[0]];
+            }
+
+            return next.length === prev.length ? prev : next;
+        });
+    }, [products, selectedCategory, comparisonMode]);
+
+    const seriesConfig = useMemo(() => {
+        if (comparisonMode === 'products') {
+            return selectedProducts.map((sku) => {
+                const product = products.find(p => p.sku === sku);
+                return { key: sku, label: product ? `${product.name} (${sku})` : sku };
+            });
+        }
+
+        return selectedCompareStores.map((storeId) => {
+            const store = STORE_OPTIONS.find(s => s.id === storeId);
+            return {
+                key: `store:${storeId}`,
+                label: store ? store.label : storeId,
+            };
+        });
+    }, [comparisonMode, selectedProducts, selectedCompareStores, products]);
 
     const getAuthHeaders = (): HeadersInit => {
         const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -158,55 +219,142 @@ export default function AnalysisView() {
                         setSelectedProducts([mapped[0].sku]);
                     }
                 } else {
-                    // Fallback mock
-                    setProducts([
-                        { sku: 'SKU_001', name: 'Organic Milk 1L', category: 'Dairy' },
-                        { sku: 'SKU_015', name: 'Whole Wheat Bread', category: 'Bakery' },
-                    ]);
+                    setProducts([]);
+                    setUiNotice('Unable to load products from live API.');
                 }
             } catch (e) {
                 console.error("Failed to fetch products", e);
+                setProducts([]);
+                setUiNotice('Unable to load products from live API.');
             }
         };
         fetchProducts();
     }, []);
 
-    // Generate/Fetch Data
     useEffect(() => {
-        setLoading(true);
-        const timer = setTimeout(() => {
-            if (selectedProducts.length === 0) {
+        const fetchComparisonData = async () => {
+            const storeIds = comparisonMode === 'products' ? [selectedStore] : selectedCompareStores;
+            const productIds = comparisonMode === 'products' ? selectedProducts : [selectedProducts[0]].filter(Boolean) as string[];
+
+            if (storeIds.length === 0 || productIds.length === 0) {
                 setChartData([]);
-                setLoading(false);
                 return;
             }
-            const selectedProdObjs = products.filter(p => selectedProducts.includes(p.sku));
-            let data = generateMockHistory(selectedProdObjs, startDate, endDate, selectedStore);
 
-            // Auto-Aggregation logic based on count
-            if (data.length > 300) {
-                data = aggregateData(data, 'monthly');
-            } else if (data.length > 60) {
-                data = aggregateData(data, 'weekly');
+            if (!startDate || !endDate || startDate > endDate) {
+                setChartData([]);
+                setUiNotice('Please choose a valid date range.');
+                return;
             }
 
-            setChartData(data);
-            setLoading(false);
-        }, 500);
+            setLoading(true);
+            try {
+                const params = new URLSearchParams({
+                    start_date: startDate,
+                    end_date: endDate,
+                    store_ids: storeIds.join(','),
+                    product_ids: productIds.join(','),
+                });
 
-        return () => clearTimeout(timer);
-    }, [selectedProducts, startDate, endDate, selectedStore, products]);
+                const res = await fetch(`${API_URL}/forecast/comparison-history?${params.toString()}`, {
+                    headers: getAuthHeaders(),
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Failed to load comparison history (${res.status})`);
+                }
+
+                const payload: ComparisonApiResponse = await res.json();
+
+                const dateList = buildDateRange(startDate, endDate);
+                const dataByDate = new Map<string, DataPoint>();
+
+                dateList.forEach((day) => {
+                    const point: DataPoint = { date: day };
+                    if (comparisonMode === 'products') {
+                        selectedProducts.forEach((sku) => {
+                            point[sku] = 0;
+                        });
+                    } else {
+                        selectedCompareStores.forEach((storeId) => {
+                            point[`store:${storeId}`] = 0;
+                        });
+                    }
+                    dataByDate.set(day, point);
+                });
+
+                payload.points.forEach((p) => {
+                    const point = dataByDate.get(p.date);
+                    if (!point) return;
+
+                    const key = comparisonMode === 'products' ? p.product_id : `store:${p.store_id}`;
+                    if (key in point) {
+                        point[key] = Number.isFinite(Number(p.demand)) ? Number(p.demand) : 0;
+                    }
+                });
+
+                let data = dateList.map((day) => dataByDate.get(day)!).filter(Boolean);
+
+                if (data.length > 300) {
+                    data = aggregateData(data, 'monthly');
+                } else if (data.length > 60) {
+                    data = aggregateData(data, 'weekly');
+                }
+
+                setChartData(data);
+                if (payload.points.length === 0) {
+                    setUiNotice('No live demand records found for the selected filters.');
+                }
+            } catch (e) {
+                console.error('Failed to fetch comparison history', e);
+                setChartData([]);
+                setUiNotice('Failed to load live chart data.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchComparisonData();
+    }, [comparisonMode, selectedProducts, selectedCompareStores, startDate, endDate, selectedStore, products]);
 
     const toggleProduct = (sku: string) => {
-        if (selectedProducts.includes(sku)) {
-            setSelectedProducts(selectedProducts.filter(s => s !== sku));
-        } else {
-            if (selectedProducts.length >= 5) {
-                alert("You can compare up to 5 products at a time.");
-                return;
-            }
-            setSelectedProducts([...selectedProducts, sku]);
+        if (comparisonMode === 'stores') {
+            setSelectedProducts((prev) => (prev.includes(sku) ? [] : [sku]));
+            return;
         }
+
+        setSelectedProducts((prev) => {
+            if (prev.includes(sku)) {
+                return prev.filter(s => s !== sku);
+            }
+
+            if (prev.length >= 5) {
+                setUiNotice('You can compare up to 5 products at a time.');
+                return prev;
+            }
+
+            return [...prev, sku];
+        });
+    };
+
+    const toggleCompareStore = (storeId: string) => {
+        setSelectedCompareStores((prev) => {
+            if (prev.includes(storeId)) {
+                return prev.filter(s => s !== storeId);
+            }
+
+            if (prev.length >= 3) {
+                setUiNotice('You can compare up to 3 stores at a time.');
+                return prev;
+            }
+
+            return [...prev, storeId];
+        });
+    };
+
+    const toNumericValue = (point: DataPoint, key: string) => {
+        const value = Number(point[key]);
+        return Number.isFinite(value) ? value : 0;
     };
 
     const colors = ['#06b6d4', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b']; // Cyan, Violet, Pink, Emerald, Amber
@@ -217,7 +365,7 @@ export default function AnalysisView() {
             return (
                 <div className="h-full flex flex-col items-center justify-center text-muted gap-2">
                     <ChartIcon size={32} className="opacity-20" />
-                    <p>Select products and a date range to generate analysis</p>
+                    <p>No live demand data for the current filters.</p>
                 </div>
             );
         }
@@ -239,8 +387,8 @@ export default function AnalysisView() {
         // Calculate Scale
         let maxVal = 0;
         chartData.forEach(d => {
-            selectedProducts.forEach(sku => {
-                const val = Number(d[sku]);
+            seriesConfig.forEach((series) => {
+                const val = toNumericValue(d, series.key);
                 if (val > maxVal) maxVal = val;
             });
         });
@@ -300,17 +448,17 @@ export default function AnalysisView() {
                     </text>
 
                     {/* Data Visualization */}
-                    {selectedProducts.map((sku, idx) => {
+                    {seriesConfig.map((series, idx) => {
                         const color = colors[idx % colors.length];
 
                         // Line Chart
                         if (chartType === 'line') {
                             const pathD = chartData.map((d, i) =>
-                                `${i === 0 ? 'M' : 'L'} ${safeXScale(i)} ${yScale(Number(d[sku]))}`
+                                `${i === 0 ? 'M' : 'L'} ${safeXScale(i)} ${yScale(toNumericValue(d, series.key))}`
                             ).join(' ');
 
                             return (
-                                <g key={sku}>
+                                <g key={series.key}>
                                     <path d={pathD} fill="none" stroke={color} strokeWidth="2" className="drop-shadow-md" />
                                 </g>
                             );
@@ -319,13 +467,13 @@ export default function AnalysisView() {
                         // Area Chart
                         if (chartType === 'area') {
                             const pathD = chartData.map((d, i) =>
-                                `${i === 0 ? 'M' : 'L'} ${safeXScale(i)} ${yScale(Number(d[sku]))}`
+                                `${i === 0 ? 'M' : 'L'} ${safeXScale(i)} ${yScale(toNumericValue(d, series.key))}`
                             ).join(' ');
                             // Close the path
                             const areaPath = `${pathD} L ${chartData.length > 0 ? safeXScale(chartData.length - 1) : 0} ${innerHeight} L 0 ${innerHeight} Z`;
 
                             return (
-                                <g key={sku}>
+                                <g key={series.key}>
                                     <path d={areaPath} fill={color} fillOpacity="0.2" stroke="none" />
                                     <path d={pathD} fill="none" stroke={color} strokeWidth="2" />
                                 </g>
@@ -337,19 +485,19 @@ export default function AnalysisView() {
                             // Only render bars if data is not too dense, otherwise user should see line/aggregated
                             // Dynamic bar width
                             const groupWidth = innerWidth / chartData.length;
-                            const barWidth = Math.max((groupWidth / selectedProducts.length) * 0.8, 4); // min 4px width
+                            const barWidth = Math.max((groupWidth / Math.max(seriesConfig.length, 1)) * 0.8, 4); // min 4px width
 
                             // If too dense, only render lines? Or render simpler bars
                             return chartData.map((d, i) => {
-                                const val = Number(d[sku]);
+                                const val = toNumericValue(d, series.key);
                                 const h = innerHeight - yScale(val);
                                 // Center the group
                                 const groupStart = safeXScale(i) - (groupWidth / 2);
-                                const x = groupStart + (groupWidth / 2) - ((selectedProducts.length * barWidth) / 2) + (idx * barWidth);
+                                const x = groupStart + (groupWidth / 2) - ((Math.max(seriesConfig.length, 1) * barWidth) / 2) + (idx * barWidth);
 
                                 return (
                                     <rect
-                                        key={i}
+                                        key={`${series.key}-${i}`}
                                         x={x}
                                         y={yScale(val)}
                                         width={barWidth}
@@ -367,6 +515,12 @@ export default function AnalysisView() {
         );
     };
 
+    useEffect(() => {
+        if (!uiNotice) return;
+        const timer = setTimeout(() => setUiNotice(''), 2200);
+        return () => clearTimeout(timer);
+    }, [uiNotice]);
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 min-h-[600px]">
             {/* Sidebar Controls */}
@@ -382,19 +536,70 @@ export default function AnalysisView() {
                     </CardHeader>
                     <CardContent className="space-y-6">
 
+                        {/* Comparison Mode */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-muted uppercase tracking-wider">Compare By</label>
+                            <select
+                                value={comparisonMode}
+                                onChange={(e) => setComparisonMode(e.target.value as 'products' | 'stores')}
+                                className="w-full bg-slate-900 border border-white/20 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-primary outline-none"
+                            >
+                                <option value="products">Products (within one store)</option>
+                                <option value="stores">Stores (for one SKU)</option>
+                            </select>
+                        </div>
+
                         {/* Store Selection */}
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-muted uppercase tracking-wider">Store Location</label>
                             <select
                                 value={selectedStore}
                                 onChange={(e) => setSelectedStore(e.target.value)}
+                                disabled={comparisonMode === 'stores'}
                                 className="w-full bg-slate-900 border border-white/20 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-primary outline-none"
                             >
-                                <option value="S1">Store S1 (Downtown)</option>
-                                <option value="S2">Store S2 (Westside)</option>
-                                <option value="S3">Store S3 (Airport)</option>
+                                {STORE_OPTIONS.map((store) => (
+                                    <option key={store.id} value={store.id}>{store.label}</option>
+                                ))}
+                            </select>
+                            {comparisonMode === 'stores' && (
+                                <p className="text-[10px] text-muted">Store comparison mode uses the store checklist below.</p>
+                            )}
+                        </div>
+
+                        {/* Category Filter */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-muted uppercase tracking-wider">Category</label>
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="w-full bg-slate-900 border border-white/20 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-primary outline-none"
+                            >
+                                <option value="all">All Categories</option>
+                                {categoryOptions.map((category) => (
+                                    <option key={category} value={category}>{category}</option>
+                                ))}
                             </select>
                         </div>
+
+                        {comparisonMode === 'stores' && (
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-muted uppercase tracking-wider">Stores To Compare</label>
+                                <div className="space-y-2">
+                                    {STORE_OPTIONS.map((store) => (
+                                        <label key={store.id} className="flex items-center justify-between p-2 bg-white/5 rounded-lg border border-white/10 text-sm">
+                                            <span>{store.label}</span>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedCompareStores.includes(store.id)}
+                                                onChange={() => toggleCompareStore(store.id)}
+                                                className="accent-cyan-500"
+                                            />
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Date Selection */}
                         <div className="space-y-2">
@@ -444,10 +649,14 @@ export default function AnalysisView() {
 
                         {/* Product Selection */}
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-muted uppercase tracking-wider">Products</label>
+                            <label className="text-xs font-bold text-muted uppercase tracking-wider">
+                                {comparisonMode === 'products' ? 'Products' : 'Target Product'}
+                            </label>
+                            {comparisonMode === 'stores' && (
+                                <p className="text-[10px] text-muted">Select one product below, then compare it across stores.</p>
+                            )}
                             <div className="space-y-2">
-                                {products
-                                    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+                                {filteredProducts
                                     .slice(0, 10)
                                     .map((p) => (
                                         <div key={p.sku} className="flex items-center justify-between p-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
@@ -464,21 +673,30 @@ export default function AnalysisView() {
                                                 onClick={() => toggleProduct(p.sku)}
                                                 className={`px-2 py-1 rounded text-xs ${selectedProducts.includes(p.sku) ? 'bg-primary/20 text-primary' : 'bg-white/10 text-muted'}`}
                                             >
-                                                {selectedProducts.includes(p.sku) ? 'Selected' : 'Compare'}
+                                                {selectedProducts.includes(p.sku)
+                                                    ? 'Selected'
+                                                    : (comparisonMode === 'products' ? 'Compare' : 'Use')}
                                             </button>
                                         </div>
                                     ))}
                             </div>
-                            {selectedProducts.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {selectedProducts.map(sku => (
-                                        <Badge key={sku} variant="info" className="text-[10px]">
-                                            <CheckIcon size={10} className="mr-1" /> {sku}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            )}
                         </div>
+
+                        {seriesConfig.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {seriesConfig.map((series) => (
+                                    <Badge key={series.key} variant="info" className="text-[10px]">
+                                        <CheckIcon size={10} className="mr-1" /> {series.label}
+                                    </Badge>
+                                ))}
+                            </div>
+                        )}
+
+                        {uiNotice && (
+                            <div className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-400/20 rounded-md px-2 py-1">
+                                {uiNotice}
+                            </div>
+                        )}
 
                         {/* Chart Type */}
                         <div className="space-y-2">
@@ -508,7 +726,11 @@ export default function AnalysisView() {
                             <ChartIcon size={18} className="text-info" />
                             Comparative Demand Analysis
                         </CardTitle>
-                        <CardDescription>Visualize historical demand trends across selected products</CardDescription>
+                        <CardDescription>
+                            {comparisonMode === 'products'
+                                ? 'Visualize historical demand trends across selected products in one store'
+                                : 'Compare demand patterns of one selected product across selected stores'}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="w-full overflow-x-auto">
@@ -516,7 +738,12 @@ export default function AnalysisView() {
                         </div>
                         <div className="mt-3 flex items-center gap-2 text-[10px] text-muted">
                             <span className="w-2 h-2 rounded-full bg-primary"></span>
-                            <span>Lines represent average demand values over time. For dense datasets, aggregation automatically switches to weekly/monthly.</span>
+                            <span>
+                                {comparisonMode === 'products'
+                                    ? 'Lines represent average demand values over time for selected products.'
+                                    : 'Lines represent average demand values over time for selected stores of the chosen SKU.'}
+                                {' '}For dense datasets, aggregation automatically switches to weekly/monthly.
+                            </span>
                         </div>
                     </CardContent>
                 </Card>

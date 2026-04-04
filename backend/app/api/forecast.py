@@ -128,6 +128,20 @@ class ProductForecastDetail(BaseModel):
     data_source: str
 
 
+class ComparisonPoint(BaseModel):
+    date: str
+    store_id: str
+    product_id: str
+    demand: float
+
+
+class ComparisonHistoryResponse(BaseModel):
+    start_date: str
+    end_date: str
+    points: List[ComparisonPoint]
+    data_source: str
+
+
 # ==========================================
 # HELPER FUNCTIONS
 # ==========================================
@@ -376,6 +390,60 @@ async def get_product_forecast_detail(
         stock_days_remaining=round(stock_days, 1),
         stock_status=status,
         data_source="PostgreSQL (live)"
+    )
+
+
+@router.get("/comparison-history", response_model=ComparisonHistoryResponse)
+def get_comparison_history(
+    start_date: date = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: date = Query(..., description="End date (YYYY-MM-DD)"),
+    store_ids: str = Query(..., description="Comma-separated store ids, e.g. S1,S2"),
+    product_ids: str = Query(..., description="Comma-separated product ids, e.g. SKU_A,SKU_B"),
+    db: Session = Depends(get_db),
+):
+    """Get historical demand points for chart comparison directly from DailyDemand."""
+    if start_date > end_date:
+        raise HTTPException(status_code=400, detail="start_date must be <= end_date")
+
+    store_list = [s.strip() for s in store_ids.split(',') if s.strip()]
+    product_list = [p.strip() for p in product_ids.split(',') if p.strip()]
+
+    if not store_list:
+        raise HTTPException(status_code=400, detail="At least one store_id is required")
+    if not product_list:
+        raise HTTPException(status_code=400, detail="At least one product_id is required")
+
+    rows = (
+        db.query(
+            DailyDemand.date,
+            DailyDemand.store_id,
+            DailyDemand.product_id,
+            func.sum(DailyDemand.total_quantity).label("demand"),
+        )
+        .filter(DailyDemand.date >= start_date)
+        .filter(DailyDemand.date <= end_date)
+        .filter(DailyDemand.store_id.in_(store_list))
+        .filter(DailyDemand.product_id.in_(product_list))
+        .group_by(DailyDemand.date, DailyDemand.store_id, DailyDemand.product_id)
+        .order_by(DailyDemand.date.asc())
+        .all()
+    )
+
+    points = [
+        ComparisonPoint(
+            date=row.date.isoformat(),
+            store_id=row.store_id,
+            product_id=row.product_id,
+            demand=float(row.demand or 0.0),
+        )
+        for row in rows
+    ]
+
+    return ComparisonHistoryResponse(
+        start_date=start_date.isoformat(),
+        end_date=end_date.isoformat(),
+        points=points,
+        data_source="PostgreSQL (live daily_demand)",
     )
 
 

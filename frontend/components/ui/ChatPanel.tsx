@@ -34,8 +34,16 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [baseline, setBaseline] = useState<number | null>(null);
+    const [storeId, setStoreId] = useState<string | null>(null);
     const [categories, setCategories] = useState<Record<string, string>>({});
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const normalizeStoreId = (value: unknown): string | null => {
+        if (typeof value === 'string' && value.trim()) {
+            return value.trim().toUpperCase();
+        }
+        return null;
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -47,9 +55,23 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
 
     // Fetch baseline on mount
     useEffect(() => {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            try {
+                const parsed = JSON.parse(userData);
+                const normalized = normalizeStoreId(parsed?.store_id);
+                if (normalized) {
+                    setStoreId(normalized);
+                }
+            } catch (error) {
+                console.error('Error parsing user store_id:', error);
+            }
+        }
+
         const fetchBaseline = async () => {
             try {
-                const response = await fetch(`${API_URL}/simulations/baseline`, {
+                const query = storeId ? `?store_id=${encodeURIComponent(storeId)}` : '';
+                const response = await fetch(`${API_URL}/simulations/baseline${query}`, {
                     headers: getAuthHeaders(),
                 });
                 if (response.ok) {
@@ -91,11 +113,16 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
         
         fetchBaseline();
         fetchCategories();
-    }, []);
+    }, [storeId]);
 
     const analyzeScenario = async (scenarioText: string) => {
         try {
-            const response = await fetch(`${API_URL}/simulations/custom?scenario_text=${encodeURIComponent(scenarioText)}`, {
+            const params = new URLSearchParams({ scenario_text: scenarioText });
+            if (storeId) {
+                params.set('store_id', storeId);
+            }
+
+            const response = await fetch(`${API_URL}/simulations/custom?${params.toString()}`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
             });
@@ -104,6 +131,11 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
                 const result = await response.json();
                 return result;
             }
+
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                error: errorData?.detail || `Simulation failed with status ${response.status}`,
+            };
         } catch (error) {
             console.error('Error analyzing scenario:', error);
         }
@@ -128,20 +160,27 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
 
         let responseText = '';
         
-        if (result) {
+        if (result && !result.error) {
             // Notify parent component
             if (onScenarioAnalyzed) {
                 onScenarioAnalyzed(result);
             }
 
             // Create conversational response
-            const baselineDemand = baseline || result.demand; // Fallback to result demand if baseline not loaded
-            const demandChange = ((result.demand / baselineDemand) - 1) * 100;
+            const baselineDemand = result.baseline_demand_used || baseline || result.demand;
+            const demandChange = typeof result.multiplier_used === 'number'
+                ? (result.multiplier_used - 1) * 100
+                : ((result.demand / baselineDemand) - 1) * 100;
             const direction = demandChange > 0 ? 'increase' : 'decrease';
-            const changeAmount = Math.abs(demandChange).toFixed(0);
+            const absChange = Math.abs(demandChange);
+            const changeAmount = absChange < 1 ? absChange.toFixed(1) : absChange.toFixed(0);
+            const deltaUnits = result.demand - baselineDemand;
+            const deltaSign = deltaUnits >= 0 ? '+' : '';
 
             responseText = `Based on your scenario, here's what I predict:\n\n`;
+            responseText += `📉 **Current Demand**: ${Math.round(baselineDemand).toLocaleString()} units per day\n\n`;
             responseText += `📊 **Projected Demand**: ${result.demand.toLocaleString()} units per day\n\n`;
+            responseText += `🧮 **Delta**: ${deltaSign}${Math.round(deltaUnits).toLocaleString()} units/day\n\n`;
             
             if (result.ai_reasoning) {
                 responseText += `💡 **Why**: ${result.ai_reasoning}\n\n`;
@@ -201,6 +240,8 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
             }
 
             responseText += `\n\nWant to explore another scenario? Just ask!`;
+        } else if (result?.error) {
+            responseText = `I couldn't run the AI analysis right now: ${result.error}`;
         } else {
             responseText = "I'm having trouble analyzing that scenario right now. Could you rephrase it or try a different scenario?";
         }

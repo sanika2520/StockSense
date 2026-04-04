@@ -17,7 +17,6 @@ import {
     DatabaseIcon,
     RefreshIcon,
 } from '@/components/ui/Icons';
-import InsightAssistant from '@/components/features/InsightAssistant';
 import AlertsPanel from './components/AlertsPanel';
 import ForecastsTable from './components/ForecastsTable';
 import PurchaseOrders from './components/PurchaseOrders';
@@ -62,6 +61,20 @@ interface ForecastSummary {
     avg_confidence: number;
 }
 
+interface ProductCatalogItem {
+    sku: string;
+    name: string;
+    category: string;
+}
+
+interface DropdownProductOption {
+    sku: string;
+    product_name: string;
+    category: string;
+    current_stock: number;
+    seven_day_forecast: number;
+}
+
 interface PurchaseOrder {
     id: number;
     po_number: string;
@@ -94,6 +107,7 @@ export default function ManagerDashboard() {
     const [forecasts, setForecasts] = useState<ForecastItem[]>([]);
     const [alerts, setAlerts] = useState<ForecastAlert[]>([]);
     const [summary, setSummary] = useState<ForecastSummary | null>(null);
+    const [productCatalog, setProductCatalog] = useState<ProductCatalogItem[]>([]);
     const [forecastLoading, setForecastLoading] = useState(false);
     const [selectedStore, setSelectedStore] = useState<string>('');
 
@@ -184,6 +198,15 @@ export default function ManagerDashboard() {
             if (summaryRes.ok) {
                 const summaryData = await summaryRes.json();
                 setSummary(summaryData);
+            }
+
+            // Fetch full product catalog (CSV-backed) for category/SKU dropdowns
+            const productsRes = await fetch(`${API_URL}/forecast/products`, {
+                headers: authHeaders,
+            });
+            if (productsRes.ok) {
+                const productsData = await productsRes.json();
+                setProductCatalog(Array.isArray(productsData) ? productsData : []);
             }
 
             // Fetch purchase orders
@@ -295,6 +318,22 @@ export default function ManagerDashboard() {
             default: return 'border-l-muted';
         }
     };
+
+    const dropdownProductOptions: DropdownProductOption[] = productCatalog.length > 0
+        ? productCatalog.map((p) => ({
+            sku: p.sku,
+            product_name: p.name,
+            category: p.category || 'Uncategorized',
+            current_stock: 0,
+            seven_day_forecast: 0,
+        }))
+        : forecasts.map((f) => ({
+            sku: f.sku,
+            product_name: f.product_name,
+            category: f.category || 'Uncategorized',
+            current_stock: f.current_stock,
+            seven_day_forecast: f.seven_day_forecast,
+        }));
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -414,12 +453,6 @@ export default function ManagerDashboard() {
                             Store Manager Dashboard
                             <span className="w-1 h-1 bg-white/20 rounded-full"></span>
                             <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                            {summary && (
-                                <>
-                                    <span className="w-1 h-1 bg-white/20 rounded-full"></span>
-                                    <span className="text-success">Model Confidence: {(summary.avg_confidence * 100).toFixed(0)}%</span>
-                                </>
-                            )}
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -502,15 +535,12 @@ export default function ManagerDashboard() {
                     <InventoryByStore inventoryByStore={inventoryByStore} onManage={() => setShowRebalancingModal(true)} />
                 </div>
 
-                {/* LLM Assistant */}
-                {/* @ts-expect-error: Type mismatch due to differing ForecastAlert types, but runtime shape is compatible */}
-                <InsightAssistant forecasts={forecasts} alerts={alerts} summary={summary} />
-
                 {/* PO Creation Modal */}
                 <PurchaseOrderModal
                     showPOModal={showPOModal}
                     setShowPOModal={setShowPOModal}
                     alerts={alerts}
+                    forecasts={dropdownProductOptions}
                     poItems={poItems}
                     setPOItems={setPOItems}
                     poNotes={poNotes}
@@ -561,6 +591,7 @@ export default function ManagerDashboard() {
                     showModal={showRebalancingModal}
                     setShowModal={setShowRebalancingModal}
                     inventoryByStore={inventoryByStore}
+                    forecasts={dropdownProductOptions}
                     userStore={userStore}
                     selectedStore={selectedStore}
                     apiUrl={API_URL}

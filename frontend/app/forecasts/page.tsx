@@ -179,19 +179,6 @@ export default function ForecastsPage() {
 
     if (!user) return null;
 
-    const getConfidenceBadge = (level: string, value: number) => {
-        const variants: Record<string, 'success' | 'warning' | 'error'> = {
-            high: 'success',
-            medium: 'warning',
-            low: 'error'
-        };
-        return (
-            <Badge variant={variants[level] || 'default'}>
-                {(value * 100).toFixed(0)}% {level}
-            </Badge>
-        );
-    };
-
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'ok': return <Badge variant="success">Healthy</Badge>;
@@ -392,7 +379,7 @@ export default function ForecastsPage() {
 
                 {/* Product Info Cards */}
                 {productDetail && (
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         <Card glass>
                             <CardContent className="p-4">
                                 <p className="text-xs text-muted uppercase">Current Stock</p>
@@ -420,14 +407,6 @@ export default function ForecastsPage() {
                             <CardContent className="p-4">
                                 <p className="text-xs text-muted uppercase">Status</p>
                                 <div className="mt-2">{getStatusBadge(productDetail.stock_status)}</div>
-                            </CardContent>
-                        </Card>
-                        <Card glass>
-                            <CardContent className="p-4">
-                                <p className="text-xs text-muted uppercase">ML Confidence</p>
-                                <div className="mt-2">
-                                    {getConfidenceBadge(productDetail.confidence_level, productDetail.confidence)}
-                                </div>
                             </CardContent>
                         </Card>
                     </div>
