@@ -128,6 +128,14 @@ export default function AdminDashboard() {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('overview');
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabParam = urlParams.get('tab');
+            if (tabParam) setActiveTab(tabParam);
+        }
+    }, []);
     
     // Real data states
     const [modelMetrics, setModelMetrics] = useState<ModelMetrics | null>(null);
@@ -351,8 +359,12 @@ export default function AdminDashboard() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-background">
-                <div className="animate-pulse text-2xl font-bold gradient-text">Loading Admin Dashboard...</div>
+            <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#060610', fontFamily:"'Inter',system-ui,sans-serif" }}>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
+                    <div style={{ width:44, height:44, border:'3px solid rgba(0,207,255,0.15)', borderTopColor:'#00cfff', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+                    <span style={{ fontSize:16, fontWeight:700, background:'linear-gradient(135deg,#00cfff,#6366f1)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>Loading Admin Dashboard...</span>
+                    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                </div>
             </div>
         );
     }
@@ -823,141 +835,103 @@ export default function AdminDashboard() {
     const highRiskSKUs = highRiskItems;
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div style={{ minHeight:'100vh', background:'#060610', color:'#e8e8f0', fontFamily:"'Inter',system-ui,sans-serif" }}>
             {/* Navigation */}
-            <nav className="glass border-b border-white/10 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-8">
-                            <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-                                    <TrendingUpIcon className="text-white" size={24} />
-                                </div>
-                                <span className="text-xl font-bold gradient-text">StockSensePro</span>
+            <nav style={{ position:'sticky', top:0, zIndex:50, height:64, display:'flex', alignItems:'center', background:'rgba(6,6,16,0.85)', backdropFilter:'blur(24px) saturate(160%)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 2rem' }}>
+                <div style={{ maxWidth:1280, margin:'0 auto', width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:32 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                            <div style={{ width:36, height:36, background:'linear-gradient(135deg,#00cfff,#6366f1)', borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 20px rgba(0,207,255,0.3)' }}>
+                                <TrendingUpIcon className="text-white" size={20} />
                             </div>
-                            <div className="hidden md:flex items-center gap-1">
-                                {['overview', 'purchase-orders', 'ai-scenarios', 'scenario-chat'].map((tab) => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => {
-                                            if (tab === 'ai-scenarios') {
-                                                router.push('/admin/ai-scenarios');
-                                            } else if (tab === 'scenario-chat') {
-                                                router.push('/admin/scenario-chat');
-                                            } else {
-                                                setActiveTab(tab);
-                                            }
-                                        }}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab
-                                            ? 'bg-primary/20 text-primary'
-                                            : 'text-muted hover:text-foreground hover:bg-white/5'
-                                            }`}
-                                    >
-                                        {tab === 'purchase-orders' ? 'Purchase Orders' :
-                                         tab === 'ai-scenarios' ? 'AI Scenarios' :
-                                         tab === 'scenario-chat' ? 'AI Chat' :
-                                         tab.charAt(0).toUpperCase() + tab.slice(1)}
-                                    </button>
-                                ))}
+                            <span style={{ fontWeight:800, fontSize:18, letterSpacing:'-0.025em', color:'#fff' }}>StockSense</span>
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                            {['overview', 'purchase-orders', 'ai-scenarios', 'scenario-chat'].map((tab) => (
+                                <button
+                                    key={tab}
+                                    onClick={() => {
+                                        if (tab === 'ai-scenarios') { router.push('/admin/ai-scenarios'); }
+                                        else if (tab === 'scenario-chat') { router.push('/admin/scenario-chat'); }
+                                        else { setActiveTab(tab); }
+                                    }}
+                                    style={{ padding:'6px 16px', borderRadius:8, fontSize:13, fontWeight:600, border:'none', cursor:'pointer', transition:'all 0.2s',
+                                        background: activeTab === tab ? 'rgba(0,207,255,0.1)' : 'transparent',
+                                        color: activeTab === tab ? '#00cfff' : 'rgba(255,255,255,0.45)',
+                                        boxShadow: activeTab === tab ? '0 0 0 1px rgba(0,207,255,0.2)' : 'none',
+                                    }}
+                                >
+                                    {tab === 'purchase-orders' ? 'Purchase Orders' : tab === 'ai-scenarios' ? 'AI Scenarios' : tab === 'scenario-chat' ? 'AI Chat' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                        <button style={{ position:'relative', padding:8, background:'transparent', border:'none', cursor:'pointer', borderRadius:8 }}>
+                            <span style={{ color:'rgba(255,255,255,0.4)' }}><BellIcon size={18} /></span>
+                            <span style={{ position:'absolute', top:8, right:8, width:6, height:6, background:'#ef4444', borderRadius:'50%' }}></span>
+                        </button>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                            <div style={{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,#00cfff,#6366f1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:'#fff', boxShadow:'0 0 12px rgba(0,207,255,0.25)' }}>
+                                {user.name ? user.name[0] : user.email[0].toUpperCase()}
+                            </div>
+                            <div>
+                                <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{user.name || user.email}</div>
+                                <div style={{ fontSize:11, color:'#00cfff', display:'flex', alignItems:'center', gap:4 }}>
+                                    <ShieldIcon size={9} /> Admin
+                                </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <button className="p-2 hover:bg-white/5 rounded-lg transition-colors relative">
-                                <BellIcon className="text-muted" size={20} />
-                                <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-error rounded-full"></span>
-                            </button>
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-xs font-bold text-white">
-                                    {user.name ? user.name[0] : user.email[0].toUpperCase()}
-                                </div>
-                                <div className="hidden sm:block">
-                                    <div className="text-sm font-medium">{user.name || user.email}</div>
-                                    <div className="text-xs text-accent flex items-center gap-1">
-                                        <ShieldIcon size={10} /> Admin
-                                    </div>
-                                </div>
-                            </div>
-                            <button onClick={handleLogout} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-                                <LogoutIcon className="text-muted hover:text-error" size={18} />
-                            </button>
-                        </div>
+                        <button onClick={handleLogout} style={{ padding:8, background:'transparent', border:'none', cursor:'pointer', borderRadius:8, color:'rgba(255,255,255,0.35)', transition:'color 0.2s' }}
+                            onMouseEnter={e=>(e.currentTarget.style.color='#ef4444')} onMouseLeave={e=>(e.currentTarget.style.color='rgba(255,255,255,0.35)')}>
+                            <LogoutIcon size={17} />
+                        </button>
                     </div>
                 </div>
             </nav>
 
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* System Status Bar */}
-                <div className="glass-strong rounded-xl p-4 mb-8 border border-white/10">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-6">
-                            <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 bg-success rounded-full animate-pulse"></span>
-                                <span className="text-sm text-muted">Database: <span className="text-success font-medium">Online</span></span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 bg-success rounded-full"></span>
-                                <span className="text-sm text-muted">ML Pipeline: <span className="text-foreground font-medium">Idle</span></span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <ClockIcon size={14} className="text-muted" />
-                                <span className="text-sm text-muted">Last Forecast: <span className="text-foreground font-medium">2h ago</span></span>
-                            </div>
+                <div style={{ background:'rgba(255,255,255,0.03)', backdropFilter:'blur(16px)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:'12px 20px', marginBottom:28, display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between', gap:16 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:24 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{ width:7, height:7, background:'#10b981', borderRadius:'50%', boxShadow:'0 0 8px #10b981', display:'inline-block', animation:'pulse 2s infinite' }}></span>
+                            <span style={{ fontSize:13, color:'rgba(255,255,255,0.45)' }}>Database: <span style={{ color:'#10b981', fontWeight:600 }}>Online</span></span>
                         </div>
-                        <div className="text-sm text-muted">
-                            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{ width:7, height:7, background:'rgba(255,255,255,0.3)', borderRadius:'50%', display:'inline-block' }}></span>
+                            <span style={{ fontSize:13, color:'rgba(255,255,255,0.45)' }}>ML Pipeline: <span style={{ color:'rgba(255,255,255,0.75)', fontWeight:600 }}>Idle</span></span>
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <ClockIcon size={13} />
+                            <span style={{ fontSize:13, color:'rgba(255,255,255,0.45)' }}>Last Forecast: <span style={{ color:'rgba(255,255,255,0.75)', fontWeight:600 }}>2h ago</span></span>
                         </div>
                     </div>
+                    <span style={{ fontSize:12, color:'rgba(255,255,255,0.25)', fontWeight:500 }}>
+                        {new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
+                    </span>
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <Card glass className="group">
-                        <div className="flex items-center justify-between">
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:28 }}>
+                    {[
+                        { label:'Total SKUs', value: totalSKUs || 240, icon:<DatabaseIcon size={20}/>, accent:'#00cfff' },
+                        { label:'Stores', value:3, icon:<ChartIcon size={20}/>, accent:'#818cf8' },
+                        { label:'High Risk SKUs', value: highRiskCount, icon:<AlertIcon size={20}/>, accent:'#ef4444', valueColor:'#ef4444' },
+                        { label:'Active Users', value: users.length || 8, icon:<UserIcon size={20}/>, accent:'#34d399' },
+                    ].map((s,i) => (
+                        <div key={i} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:'20px 22px', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'border-color 0.25s, box-shadow 0.25s', cursor:'default' }}
+                            onMouseEnter={e=>{ (e.currentTarget as HTMLDivElement).style.borderColor=s.accent+'33'; (e.currentTarget as HTMLDivElement).style.boxShadow=`0 0 24px ${s.accent}12`; }}
+                            onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.borderColor='rgba(255,255,255,0.06)'; (e.currentTarget as HTMLDivElement).style.boxShadow='none'; }}>
                             <div>
-                                <p className="text-xs text-muted uppercase tracking-wider">Total SKUs</p>
-                                <h3 className="text-2xl font-bold mt-1">{totalSKUs || 240}</h3>
+                                <p style={{ fontSize:10, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.35)', marginBottom:6 }}>{s.label}</p>
+                                <h3 style={{ fontSize:28, fontWeight:800, letterSpacing:'-0.03em', color: (s as any).valueColor || '#fff', lineHeight:1 }}>{s.value}</h3>
                             </div>
-                            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
-                                <DatabaseIcon size={20} />
+                            <div style={{ width:42, height:42, borderRadius:11, background:`${s.accent}14`, border:`1px solid ${s.accent}28`, display:'flex', alignItems:'center', justifyContent:'center', color:s.accent }}>
+                                {s.icon}
                             </div>
                         </div>
-                    </Card>
-
-                    <Card glass className="group">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-muted uppercase tracking-wider">Stores</p>
-                                <h3 className="text-2xl font-bold mt-1">3</h3>
-                            </div>
-                            <div className="w-10 h-10 bg-secondary/10 rounded-lg flex items-center justify-center text-secondary">
-                                <ChartIcon size={20} />
-                            </div>
-                        </div>
-                    </Card>
-
-                    <Card glass className="group">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-muted uppercase tracking-wider">High Risk SKUs</p>
-                                <h3 className="text-2xl font-bold mt-1 text-error">{highRiskCount}</h3>
-                            </div>
-                            <div className="w-10 h-10 bg-error/10 rounded-lg flex items-center justify-center text-error">
-                                <AlertIcon size={20} />
-                            </div>
-                        </div>
-                    </Card>
-
-                    <Card glass className="group">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-muted uppercase tracking-wider">Active Users</p>
-                                <h3 className="text-2xl font-bold mt-1">8</h3>
-                            </div>
-                            <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center text-accent">
-                                <UserIcon size={20} />
-                            </div>
-                        </div>
-                    </Card>
+                    ))}
                 </div>
 
                 {/* Purchase Orders Section */}
@@ -1270,7 +1244,15 @@ export default function AdminDashboard() {
                                     </CardTitle>
                                     <CardDescription>Manage roles and permissions</CardDescription>
                                 </div>
-                                <Button variant="primary" size="sm" onClick={() => openUserModal()}>
+                                <Button 
+                                    size="sm" 
+                                    onClick={() => openUserModal()}
+                                    style={{ 
+                                        background: 'linear-gradient(135deg, #00cfff, #6366f1)', 
+                                        border: 'none',
+                                        boxShadow: '0 0 15px rgba(0,207,255,0.2)'
+                                    }}
+                                >
                                     Add User
                                 </Button>
                             </div>
@@ -1414,68 +1396,122 @@ export default function AdminDashboard() {
 
             {/* User Modal */}
             {showUserModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeUserModal}>
-                    <div className="bg-surface border border-white/10 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold mb-4">{editingUser ? 'Edit User' : 'Create New User'}</h3>
-                        
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-sm text-muted mb-1 block">Name</label>
-                                <Input
-                                    value={userForm.name}
-                                    onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
-                                    placeholder="John Doe"
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="text-sm text-muted mb-1 block">Email</label>
-                                <Input
-                                    type="email"
-                                    value={userForm.email}
-                                    onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                                    placeholder="john@company.com"
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="text-sm text-muted mb-1 block">
-                                    Password {editingUser && '(leave blank to keep current)'}
-                                </label>
-                                <Input
-                                    type="password"
-                                    value={userForm.password}
-                                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                                    placeholder={editingUser ? 'Enter new password' : 'Password'}
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="text-sm text-muted mb-1 block">Role</label>
-                                <select
-                                    value={userForm.role}
-                                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-foreground"
-                                >
-                                    <option value="analyst">Analyst</option>
-                                    <option value="manager">Manager</option>
-                                    <option value="admin">Admin</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div className="flex gap-3 mt-6">
-                            <Button variant="secondary" onClick={closeUserModal} className="flex-1">
-                                Cancel
-                            </Button>
-                            <Button variant="primary" onClick={handleSaveUser} className="flex-1">
-                                {editingUser ? 'Update' : 'Create'}
-                            </Button>
-                        </div>
-                    </div>
+    <div
+        onClick={closeUserModal}
+        style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1.5rem',
+        }}
+    >
+        <div
+            onClick={e => e.stopPropagation()}
+            style={{
+                position: 'relative',
+                width: '100%', maxWidth: 440,
+                background: '#080811',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 16,
+                padding: '32px 32px 28px',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+            }}
+        >
+            {/* Top glow line */}
+            <div style={{
+                position: 'absolute', top: 0, left: '20%', right: '20%', height: 1,
+                background: 'linear-gradient(90deg, transparent, rgba(0,207,255,0.5), transparent)',
+            }} />
+
+            {/* Title */}
+            <h3 style={{
+                fontSize: 20, fontWeight: 800, color: '#fff',
+                letterSpacing: '-0.02em', marginBottom: 24,
+            }}>
+                {editingUser ? 'Edit User' : 'Create New User'}
+            </h3>
+
+            {/* Fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>Name</label>
+                    <input
+                        value={userForm.name}
+                        onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                        placeholder="John Doe"
+                        style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, color: '#e8e8f0', fontSize: 14, outline: 'none', fontFamily: 'inherit', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                        onFocus={e => { e.target.style.borderColor = 'rgba(0,207,255,0.4)'; e.target.style.boxShadow = '0 0 0 3px rgba(0,207,255,0.08)'; }}
+                        onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.09)'; e.target.style.boxShadow = 'none'; }}
+                    />
                 </div>
-            )}
-            
+
+                <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>Email</label>
+                    <input
+                        type="email"
+                        value={userForm.email}
+                        onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                        placeholder="john@company.com"
+                        style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, color: '#e8e8f0', fontSize: 14, outline: 'none', fontFamily: 'inherit', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                        onFocus={e => { e.target.style.borderColor = 'rgba(0,207,255,0.4)'; e.target.style.boxShadow = '0 0 0 3px rgba(0,207,255,0.08)'; }}
+                        onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.09)'; e.target.style.boxShadow = 'none'; }}
+                    />
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
+                        Password {editingUser && <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(leave blank to keep current)</span>}
+                    </label>
+                    <input
+                        type="password"
+                        value={userForm.password}
+                        onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                        placeholder={editingUser ? 'Enter new password' : 'Password'}
+                        style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, color: '#e8e8f0', fontSize: 14, outline: 'none', fontFamily: 'inherit', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                        onFocus={e => { e.target.style.borderColor = 'rgba(0,207,255,0.4)'; e.target.style.boxShadow = '0 0 0 3px rgba(0,207,255,0.08)'; }}
+                        onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.09)'; e.target.style.boxShadow = 'none'; }}
+                    />
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>Role</label>
+                    <select
+                        value={userForm.role}
+                        onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+                        style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, color: '#e8e8f0', fontSize: 14, outline: 'none', fontFamily: 'inherit', transition: 'border-color 0.2s', cursor: 'pointer' }}
+                        onFocus={e => e.target.style.borderColor = 'rgba(0,207,255,0.4)'}
+                        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.09)'}
+                    >
+                        <option value="analyst" style={{ background: '#080811' }}>Analyst</option>
+                        <option value="manager" style={{ background: '#080811' }}>Manager</option>
+                        <option value="admin" style={{ background: '#080811' }}>Admin</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: 12, marginTop: 28 }}>
+                <button
+                    onClick={closeUserModal}
+                    style={{ flex: 1, padding: '12px', borderRadius: 10, fontSize: 14, fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', transition: 'all 0.2s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={handleSaveUser}
+                    style={{ flex: 1, padding: '12px', borderRadius: 10, fontSize: 14, fontWeight: 700, border: 'none', background: 'linear-gradient(135deg, #00cfff, #6366f1)', color: '#fff', cursor: 'pointer', boxShadow: '0 0 24px rgba(0,207,255,0.2)', transition: 'all 0.2s' }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 32px rgba(0,207,255,0.35)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 24px rgba(0,207,255,0.2)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                >
+                    {editingUser ? 'Update' : 'Create'}
+                </button>
+            </div>
+        </div>
+    </div>
+)}
             {/* Deliver PO Modal */}
             {showDeliverModal && selectedPO && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDeliverModal(false)}>

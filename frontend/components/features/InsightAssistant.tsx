@@ -48,6 +48,7 @@ interface InsightAssistantProps {
     alerts?: ForecastAlert[];
     summary?: ForecastSummary | null;
     productDetail?: ProductDetail | null;
+    onDrawerChange?: (open: boolean) => void;
 }
 
 interface Insight {
@@ -55,7 +56,7 @@ interface Insight {
     content: string;
 }
 
-export default function InsightAssistant({ forecasts, alerts, summary, productDetail }: InsightAssistantProps) {
+export default function InsightAssistant({ forecasts, alerts, summary, productDetail, onDrawerChange }: InsightAssistantProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [insights, setInsights] = useState<Insight[]>([]);
@@ -89,12 +90,12 @@ export default function InsightAssistant({ forecasts, alerts, summary, productDe
                         if (percentChange > 10) {
                             newInsights.push({
                                 type: 'suggestion',
-                                content: `📈 Trend Alert: Demand is rapidly increasing! It’s expected to grow by ${percentChange.toFixed(0)}% over the forecast period. Consider increasing safety stock.`
+                                content: `Trend Alert: Demand is rapidly increasing! It’s expected to grow by ${percentChange.toFixed(0)}% over the forecast period. Consider increasing safety stock.`
                             });
                         } else if (percentChange < -10) {
                             newInsights.push({
                                 type: 'analysis',
-                                content: `📉 Trend Alert: Demand is tapering off. Expect a ${Math.abs(percentChange).toFixed(0)}% drop by the end of the period. You can safely reduce replenishment orders.`
+                                content: `Trend Alert: Demand is tapering off. Expect a ${Math.abs(percentChange).toFixed(0)}% drop by the end of the period. You can safely reduce replenishment orders.`
                             });
                         } else {
                             newInsights.push({
@@ -125,12 +126,12 @@ export default function InsightAssistant({ forecasts, alerts, summary, productDe
             if (productDetail.confidence < 0.7) {
                 newInsights.push({
                     type: 'analysis',
-                    content: `⚠️ Low Confidence (${(productDetail.confidence * 100).toFixed(0)}%): The model is uncertain, possibly due to erratic historical patterns. Verify with recent sales data manually before making large bulk orders.`
+                    content: `Low Confidence (${(productDetail.confidence * 100).toFixed(0)}%): The model is uncertain, possibly due to erratic historical patterns. Verify with recent sales data manually before making large bulk orders.`
                 });
             } else {
                 newInsights.push({
                     type: 'analysis',
-                    content: `✅ High Confidence (${(productDetail.confidence * 100).toFixed(0)}%): The prediction allows for aggressive optimization. You can lower safety stock buffers to free up capital.`
+                    content: `High Confidence (${(productDetail.confidence * 100).toFixed(0)}%): The prediction allows for aggressive optimization. You can lower safety stock buffers to free up capital.`
                 });
             }
 
@@ -222,107 +223,225 @@ export default function InsightAssistant({ forecasts, alerts, summary, productDe
     }, [insights]);
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none">
-            {/* Chat Window */}
-            {isOpen && (
-                <div className="mb-4 w-80 md:w-96 pointer-events-auto transition-all animate-in slide-in-from-bottom-5 fade-in duration-300">
-                    <Card glass className="border-secondary/20 shadow-2xl shadow-secondary/10 flex flex-col max-h-[500px]">
-                        <CardHeader className="bg-white/5 border-b border-white/5 py-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                                        <div className="text-white text-xs font-bold">AI</div>
-                                    </div>
-                                    <div>
-                                        <CardTitle className="text-sm">Insight Assistant</CardTitle>
-                                        <p className="text-[10px] text-muted">Powered by LLM</p>
-                                    </div>
-                                </div>
-                                <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} className="h-8 w-8 p-0">
-                                    ✕
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-0 flex-1 overflow-y-auto min-h-[300px] max-h-[400px]">
-                            <div className="p-4 space-y-4">
-                                <div className="flex gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex-shrink-0 flex items-center justify-center mt-1">
-                                        <span className="text-white text-xs">AI</span>
-                                    </div>
-                                    <div className="bg-white/5 rounded-2xl rounded-tl-none p-3 text-sm border border-white/10">
-                                        <p>Hello! I've analyzed your latest forecast data. Here are my key findings and suggestions.</p>
-                                    </div>
-                                </div>
+    <>
+        {/* Slide-in Drawer */}
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            height: '100vh',
+            width: 380,
+            zIndex: 200,
+            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'rgba(6,6,16,0.97)',
+            backdropFilter: 'blur(24px) saturate(160%)',
+            borderLeft: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: isOpen ? '-20px 0 60px rgba(0,0,0,0.5)' : 'none',
+        }}>
+            {/* Top glow line */}
+            <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+                background: 'linear-gradient(90deg, transparent, rgba(0,207,255,0.4), transparent)',
+            }} />
 
-                                {loading && (
-                                    <div className="flex gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex-shrink-0 flex items-center justify-center mt-1">
-                                            <span className="text-white text-xs">AI</span>
-                                        </div>
-                                        <div className="bg-white/5 rounded-2xl rounded-tl-none p-3 text-sm border border-white/10">
-                                            <div className="flex gap-1">
-                                                <span className="w-2 h-2 bg-secondary rounded-full animate-bounce"></span>
-                                                <span className="w-2 h-2 bg-secondary rounded-full animate-bounce delay-100"></span>
-                                                <span className="w-2 h-2 bg-secondary rounded-full animate-bounce delay-200"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {insights.map((insight, idx) => (
-                                    <div key={idx} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex-shrink-0 flex items-center justify-center mt-1">
-                                            <span className="text-white text-xs">AI</span>
-                                        </div>
-                                        <div className={`rounded-2xl rounded-tl-none p-3 text-sm border shadow-sm ${insight.type === 'warning' ? 'bg-error/20 border-error/30 text-white' :
-                                                insight.type === 'suggestion' ? 'bg-secondary/20 border-secondary/30 text-white' :
-                                                    'bg-white/10 border-white/20 text-white'
-                                            }`}>
-                                            <div className="flex items-start gap-2">
-                                                {insight.type === 'warning' && <AlertIcon size={16} className="text-error mt-0.5" />}
-                                                {insight.type === 'suggestion' && <TrendingUpIcon size={16} className="text-secondary mt-0.5" />}
-                                                {insight.type === 'analysis' && <CheckIcon size={16} className="text-success mt-0.5" />}
-                                                <p>{insight.content}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                                <div ref={chatEndRef} />
-                            </div>
-                        </CardContent>
-                        <div className="p-3 border-t border-white/10 bg-surface-elevated/50 backdrop-blur-sm">
-                            <Button
-                                variant="secondary"
-                                className="w-full text-xs"
-                                onClick={generateInsights}
-                                disabled={loading}
-                            >
-                                <RefreshIcon size={14} className={loading ? "animate-spin" : ""} />
-                                {loading ? 'Analyzing...' : 'Regenerate Insights'}
-                            </Button>
-                        </div>
-                    </Card>
+            {/* Header */}
+            <div style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'rgba(255,255,255,0.02)',
+                flexShrink: 0,
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #00cfff, #6366f1)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 0 12px rgba(0,207,255,0.3)',
+                    }}>
+                        <span style={{ color: '#fff', fontSize: 12, fontWeight: 800 }}>AI</span>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Insight Assistant</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.05em' }}>Powered by LLM</div>
+                    </div>
                 </div>
-            )}
+                <button
+                    onClick={() => { setIsOpen(false); onDrawerChange?.(false); }}
+                    style={{
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        color: 'rgba(255,255,255,0.35)', padding: 8, borderRadius: 8,
+                        fontSize: 18, lineHeight: 1, transition: 'color 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}
+                >
+                    ✕
+                </button>
+            </div>
 
-            {/* Floating Trigger Button */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-14 h-14 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all pointer-events-auto"
-            >
-                {isOpen ? (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                ) : (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        <line x1="9" y1="10" x2="15" y2="10" />
-                        <line x1="12" y1="7" x2="12" y2="13" />
-                    </svg>
+            {/* Chat Body */}
+            <div style={{
+                padding: 16, flex: 1, overflowY: 'auto',
+                display: 'flex', flexDirection: 'column', gap: 16,
+            }}>
+                {/* Initial Message */}
+                <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{
+                        width: 28, height: 28, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #00cfff, #6366f1)',
+                        flexShrink: 0, display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', marginTop: 4,
+                    }}>
+                        <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>AI</span>
+                    </div>
+                    <div style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        borderRadius: '16px 16px 16px 4px',
+                        padding: '10px 14px', fontSize: 13,
+                        color: '#e8e8f0', lineHeight: 1.6,
+                    }}>
+                        Hello! I've analyzed your latest forecast data. Here are my key findings and suggestions.
+                    </div>
+                </div>
+
+                {/* Loading dots */}
+                {loading && (
+                    <div style={{ display: 'flex', gap: 12 }}>
+                        <div style={{
+                            width: 28, height: 28, borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #00cfff, #6366f1)',
+                            flexShrink: 0, display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', marginTop: 4,
+                        }}>
+                            <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>AI</span>
+                        </div>
+                        <div style={{
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                            borderRadius: '16px 16px 16px 4px',
+                            padding: '12px 16px',
+                        }}>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <span style={{ width: 6, height: 6, background: '#00cfff', borderRadius: '50%', animation: 'bounce 1s infinite' }}></span>
+                                <span style={{ width: 6, height: 6, background: '#00cfff', borderRadius: '50%', animation: 'bounce 1s infinite 0.15s' }}></span>
+                                <span style={{ width: 6, height: 6, background: '#00cfff', borderRadius: '50%', animation: 'bounce 1s infinite 0.3s' }}></span>
+                            </div>
+                        </div>
+                    </div>
                 )}
-            </button>
+
+                {/* Insights */}
+                {insights.map((insight, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 12 }}>
+                        <div style={{
+                            width: 28, height: 28, borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #00cfff, #6366f1)',
+                            flexShrink: 0, display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', marginTop: 4,
+                        }}>
+                            <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>AI</span>
+                        </div>
+                        <div style={{
+                            background: insight.type === 'warning'
+                                ? 'rgba(248,113,113,0.08)'
+                                : insight.type === 'suggestion'
+                                ? 'rgba(0,207,255,0.08)'
+                                : 'rgba(255,255,255,0.03)',
+                            border: insight.type === 'warning'
+                                ? '1px solid rgba(248,113,113,0.2)'
+                                : insight.type === 'suggestion'
+                                ? '1px solid rgba(0,207,255,0.18)'
+                                : '1px solid rgba(255,255,255,0.06)',
+                            borderRadius: '16px 16px 16px 4px',
+                            padding: '10px 14px', fontSize: 13,
+                            color: '#e8e8f0', lineHeight: 1.6,
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                {insight.type === 'warning' && <span style={{ color: '#f87171', marginTop: 2 }}><AlertIcon size={14} /></span>}
+                                {insight.type === 'suggestion' && <span style={{ color: '#00cfff', marginTop: 2 }}><TrendingUpIcon size={14} /></span>}
+                                {insight.type === 'analysis' && <span style={{ color: '#34d399', marginTop: 2 }}><CheckIcon size={14} /></span>}
+                                <p style={{ margin: 0 }}>{insight.content}</p>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+                <div ref={chatEndRef} />
+            </div>
+
+            {/* Footer */}
+            <div style={{
+                padding: 12,
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+                background: 'rgba(255,255,255,0.02)',
+                flexShrink: 0,
+            }}>
+                <button
+                    onClick={generateInsights}
+                    disabled={loading}
+                    style={{
+                        width: '100%', padding: '10px 16px', borderRadius: 8,
+                        fontSize: 13, fontWeight: 700,
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'rgba(255,255,255,0.03)',
+                        color: loading ? 'rgba(255,255,255,0.3)' : '#fff',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
+                    onMouseLeave={e => { if (!loading) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                >
+                    <RefreshIcon size={13} className={loading ? 'animate-spin' : ''} />
+                    {loading ? 'Analyzing...' : 'Regenerate Insights'}
+                </button>
+            </div>
         </div>
+
+        {/* Backdrop (subtle, only on mobile) */}
+        {isOpen && (
+    <div
+        onClick={() => { setIsOpen(false); onDrawerChange?.(false); }}
+        style={{
+            position: 'fixed', inset: 0, zIndex: 199,
+        }}
+    />
+)}
+
+        {/* Trigger Tab — fixed to right edge, visible when drawer is closed */}
+        {!isOpen && (
+            <button
+                onClick={() => { setIsOpen(true); onDrawerChange?.(true); }}
+                style={{
+                    position: 'fixed', right: 0, top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 201,
+                    background: 'linear-gradient(135deg, #00cfff, #6366f1)',
+                    border: 'none', cursor: 'pointer',
+                    borderRadius: '10px 0 0 10px',
+                    padding: '14px 10px',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', gap: 8,
+                    boxShadow: '-4px 0 20px rgba(0,207,255,0.2)',
+                    transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = '-4px 0 28px rgba(0,207,255,0.4)'}
+                onMouseLeave={e => e.currentTarget.style.boxShadow = '-4px 0 20px rgba(0,207,255,0.2)'}
+            >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <span style={{
+                    color: '#fff', fontSize: 10, fontWeight: 800,
+                    letterSpacing: '0.08em', textTransform: 'uppercase',
+                    writingMode: 'vertical-rl', textOrientation: 'mixed',
+                }}>AI</span>
+            </button>
+        )}
+    </>
     );
 }

@@ -22,7 +22,27 @@ const PurchaseOrders: React.FC<PurchaseOrdersProps> = ({ purchaseOrders, forecas
           </CardTitle>
           <CardDescription>Recent orders and their status</CardDescription>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setShowPOModal(true)}>+ New PO</Button>
+        <button
+  onClick={() => setShowPOModal(true)}
+  style={{
+    height: 36,
+    padding: '0 16px',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 700,
+    border: 'none',
+    background: 'linear-gradient(135deg, #00cfff, #6366f1)',
+    color: '#fff',
+    cursor: 'pointer',
+    boxShadow: '0 0 14px rgba(0,207,255,0.25)',
+    transition: 'all 0.2s',
+    whiteSpace: 'nowrap',
+  }}
+  onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 22px rgba(0,207,255,0.4)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+  onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 14px rgba(0,207,255,0.25)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+>
+  + New PO
+</button>
       </div>
     </CardHeader>
     <CardContent>

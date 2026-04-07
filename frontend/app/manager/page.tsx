@@ -75,7 +75,7 @@ interface DropdownProductOption {
     seven_day_forecast: number;
 }
 
-interface PurchaseOrder {
+export interface PurchaseOrder {
     id: number;
     po_number: string;
     store_id: string;
@@ -336,191 +336,180 @@ export default function ManagerDashboard() {
         }));
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div style={{ minHeight:'100vh', background:'#060610', color:'#e8e8f0', fontFamily:"'Inter',system-ui,sans-serif" }}>
             {/* Navigation */}
-            <nav className="glass border-b border-white/10 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-8">
-                            <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center shadow-lg shadow-secondary/20">
-                                    <TrendingUpIcon className="text-white" size={24} />
-                                </div>
-                                <span className="text-xl font-bold gradient-text">StockSensePro</span>
+            <nav style={{ position:'sticky', top:0, zIndex:50, height:64, display:'flex', alignItems:'center', background:'rgba(6,6,16,0.85)', backdropFilter:'blur(24px) saturate(160%)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 2rem' }}>
+                <div style={{ maxWidth:1280, margin:'0 auto', width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:32 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                            <div style={{ width:36, height:36, background:'linear-gradient(135deg,#00cfff,#6366f1)', borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 20px rgba(0,207,255,0.3)' }}>
+                                <TrendingUpIcon className="text-white" size={20} />
                             </div>
-                            <div className="hidden md:flex items-center gap-3">
-                                {!userStore && (
-                                    <select
-                                        value={selectedStore}
-                                        onChange={(e) => handleStoreChange(e.target.value)}
-                                        className="px-3 py-1.5 !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg text-sm focus:outline-none focus:border-secondary"
-                                    >
-                                        <option value="">All Stores</option>
-                                        <option value="S1">Store S1</option>
-                                        <option value="S2">Store S2</option>
-                                        <option value="S3">Store S3</option>
-                                    </select>
-                                )}
-                                {userStore && (
-                                    <div className="px-3 py-1.5 bg-surface-elevated border border-secondary/30 rounded-lg text-sm text-secondary font-medium">
-                                        Store: {userStore}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="hidden md:flex items-center gap-1">
-                                {['overview', 'forecasts'].map((tab) => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => tab === 'forecasts' ? router.push('/forecasts') : setActiveTab(tab)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab
-                                            ? 'bg-secondary/20 text-secondary'
-                                            : 'text-muted hover:text-foreground hover:bg-white/5'
-                                            }`}
-                                    >
-                                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                                    </button>
-                                ))}
-                            </div>
+                            <span style={{ fontWeight:800, fontSize:18, letterSpacing:'-0.025em', color:'#fff' }}>StockSense</span>
                         </div>
-                        <div className="flex items-center gap-4">
-                            {/* Store Filter - only show for head manager */}
+                        <div className="hidden md:flex items-center gap-4">
                             {!userStore && (
                                 <select
                                     value={selectedStore}
                                     onChange={(e) => handleStoreChange(e.target.value)}
-                                    className="bg-slate-900 text-white border border-white/20 rounded-lg py-1.5 px-3 text-xs focus:ring-1 focus:ring-secondary outline-none"
+                                    style={{ padding:'6px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', outline:'none', fontSize:13 }}
                                 >
-                                    <option value="">All Stores</option>
-                                    <option value="S1">Store S1</option>
-                                    <option value="S2">Store S2</option>
-                                    <option value="S3">Store S3</option>
+                                    <option value="" style={{ background: '#0d0d1a' }}>All Stores</option>
+                                    <option value="S1" style={{ background: '#0d0d1a' }}>Store S1</option>
+                                    <option value="S2" style={{ background: '#0d0d1a' }}>Store S2</option>
+                                    <option value="S3" style={{ background: '#0d0d1a' }}>Store S3</option>
                                 </select>
                             )}
                             {userStore && (
-                                <div className="bg-secondary/20 text-secondary border border-secondary/30 rounded-lg py-1.5 px-3 text-xs font-medium">
+                                <div style={{ padding:'6px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(0,207,255,0.2)', borderRadius:8, color:'#00cfff', fontSize:13, fontWeight:600 }}>
                                     Store: {userStore}
                                 </div>
                             )}
-                            <button
-                                onClick={() => fetchForecastData(selectedStore || undefined)}
-                                className="p-2 hover:bg-white/5 rounded-lg transition-colors"
-                                title="Refresh data"
-                            >
-                                <RefreshIcon className={`text-muted ${forecastLoading ? 'animate-spin' : ''}`} size={18} />
-                            </button>
-                            <div className="relative hidden sm:block">
-                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
-                                <input
-                                    type="text"
-                                    placeholder="Search SKU..."
-                                    className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/20 rounded-full py-1.5 pl-9 pr-4 text-xs focus:ring-1 focus:ring-secondary outline-none transition-all w-40 focus:w-56"
-                                />
-                            </div>
-                            <button className="p-2 hover:bg-white/5 rounded-lg transition-colors relative">
-                                <BellIcon className="text-muted" size={20} />
-                                {alerts.length > 0 && (
-                                    <span className="absolute top-1 right-1 w-2 h-2 bg-error rounded-full animate-pulse"></span>
-                                )}
-                            </button>
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white">
-                                    {user.name ? user.name[0] : user.email[0].toUpperCase()}
-                                </div>
-                                <div className="hidden sm:block">
-                                    <div className="text-sm font-medium">{user.name || user.email}</div>
-                                    <div className="text-xs text-secondary flex items-center gap-1">
-                                        <BriefcaseIcon size={10} /> Manager
-                                    </div>
-                                </div>
-                            </div>
-                            <button onClick={handleLogout} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-                                <LogoutIcon className="text-muted hover:text-error" size={18} />
-                            </button>
+                            {['overview', 'forecasts'].map((tab) => (
+                                <button
+                                    key={tab}
+                                    onClick={() => tab === 'forecasts' ? router.push('/forecasts') : setActiveTab(tab)}
+                                    style={{ padding:'6px 16px', borderRadius:8, fontSize:13, fontWeight:600, border:'none', cursor:'pointer', transition:'all 0.2s',
+                                        background: activeTab === tab ? 'rgba(0,207,255,0.1)' : 'transparent',
+                                        color: activeTab === tab ? '#00cfff' : 'rgba(255,255,255,0.45)',
+                                        boxShadow: activeTab === tab ? '0 0 0 1px rgba(0,207,255,0.2)' : 'none',
+                                    }}
+                                >
+                                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                </button>
+                            ))}
                         </div>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+                        <button
+                            onClick={() => fetchForecastData(selectedStore || undefined)}
+                            style={{ padding:8, background:'transparent', border:'none', cursor:'pointer', borderRadius:8, color:'rgba(255,255,255,0.4)' }}
+                            title="Refresh data"
+                        >
+                            <RefreshIcon className={forecastLoading ? 'animate-spin' : ''} size={18} />
+                        </button>
+                        <div className="relative hidden sm:block">
+                            <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'rgba(255,255,255,0.4)', pointerEvents:'none', display:'flex' }}><SearchIcon size={16} /></span>
+                            <input
+                                type="text"
+                                placeholder="Search SKU..."
+                                style={{ width:180, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:20, padding:'6px 16px 6px 32px', fontSize:13, color:'#fff', outline:'none', transition:'all 0.2s' }}
+                                onFocus={(e)=>e.currentTarget.style.border='1px solid #00cfff'}
+                                onBlur={(e)=>e.currentTarget.style.border='1px solid rgba(255,255,255,0.1)'}
+                            />
+                        </div>
+                        <button style={{ position:'relative', padding:8, background:'transparent', border:'none', cursor:'pointer', borderRadius:8 }}>
+                            <span style={{ color:'rgba(255,255,255,0.4)' }}><BellIcon size={18} /></span>
+                            {alerts.length > 0 && (
+                                <span style={{ position:'absolute', top:8, right:8, width:6, height:6, background:'#f87171', borderRadius:'50%' }}></span>
+                            )}
+                        </button>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                            <div style={{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,#00cfff,#6366f1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:'#fff', boxShadow:'0 0 12px rgba(0,207,255,0.25)' }}>
+                                {user.name ? user.name[0] : user.email[0].toUpperCase()}
+                            </div>
+                            <div className="hidden sm:block text-left">
+                                <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{user.name || user.email}</div>
+                                <div style={{ fontSize:11, color:'#00cfff', display:'flex', alignItems:'center', gap:4 }}>
+                                    <BriefcaseIcon size={9} /> Manager
+                                </div>
+                            </div>
+                        </div>
+                        <button onClick={handleLogout} style={{ padding:8, background:'transparent', border:'none', cursor:'pointer', borderRadius:8, color:'rgba(255,255,255,0.35)', transition:'color 0.2s' }}
+                            onMouseEnter={e=>(e.currentTarget.style.color='#f87171')} onMouseLeave={e=>(e.currentTarget.style.color='rgba(255,255,255,0.35)')}>
+                            <LogoutIcon size={17} />
+                        </button>
                     </div>
                 </div>
             </nav>
 
-            <div className="max-w-7xl mx-auto px-6 py-8">
+            <div style={{ maxWidth:1280, margin:'0 auto', padding:'2rem 2rem' }}>
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight mb-2">
-                            Welcome back, <span className="gradient-text">{user.name || user.email.split('@')[0]}</span>
-                        </h1>
-                        <p className="text-muted text-sm flex items-center gap-2">
-                            <BriefcaseIcon size={14} className="text-secondary" />
-                            Store Manager Dashboard
-                            <span className="w-1 h-1 bg-white/20 rounded-full"></span>
-                            <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Button variant="secondary" size="sm">
-                            <ChartIcon size={14} />
-                            View Reports
-                        </Button>
-                        <Button variant="primary" size="sm" onClick={() => setShowPOModal(true)}>
-                            Create PO
-                        </Button>
+                <div style={{ display:'flex', flexDirection:'column', gap:16, marginBottom:32 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+                        <div>
+                            <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff', marginBottom: 8 }}>
+                                Welcome back, <span style={{ color:'#00cfff' }}>{user.name || user.email.split('@')[0]}</span>
+                            </h1>
+                            <p style={{ display:'flex', alignItems:'center', gap:8, color:'rgba(255,255,255,0.45)', fontSize:14 }}>
+                                <span style={{ color:'#00cfff', display:'flex' }}><BriefcaseIcon size={14} /></span>
+                                Store Manager Dashboard
+                                <span style={{ width:4, height:4, background:'rgba(255,255,255,0.2)', borderRadius:'50%' }}></span>
+                                <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                            </p>
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                            <button
+                                type="button"
+                                style={{ whiteSpace:'nowrap', height:42, padding:'0 20px', borderRadius:10, fontSize:14, fontWeight:600, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', transition:'all 0.2s', display:'flex', alignItems:'center', gap:8 }}
+                                onMouseEnter={e=> { e.currentTarget.style.background='rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.2)' }}
+                                onMouseLeave={e=> { e.currentTarget.style.background='rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.1)' }}
+                            >
+                                <ChartIcon size={16} />
+                                View Reports
+                            </button>
+    
+                        </div>
                     </div>
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <Card glass className="group hover:border-success/30 transition-all">
-                        <div className="flex items-center justify-between">
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:24, marginBottom:32 }}>
+                    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, padding:24, position:'relative', overflow:'hidden' }}>
+                        <div style={{ position:'absolute', top:0, left:0, width:'100%', height:'100%', background:'radial-gradient(circle at top right, rgba(0,207,255,0.05), transparent 60%)' }}></div>
+                        <div style={{ position:'relative', zIndex:1, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                             <div>
-                                <p className="text-xs text-muted uppercase tracking-wider">Total Inventory Value</p>
-                                <h3 className="text-2xl font-bold mt-1">${(totalInventoryValue / 1000).toFixed(0)}K</h3>
-                                <div className="flex items-center gap-1 mt-1">
-                                    <span className="text-xs text-muted">From real inventory data</span>
-                                </div>
+                                <p style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Total Inventory Value</p>
+                                <h3 style={{ fontSize:28, fontWeight:800, color:'#fff', margin:'8px 0 4px 0', letterSpacing:'-0.02em' }}>${(totalInventoryValue / 1000).toFixed(0)}K</h3>
+                                <div style={{ fontSize:13, color:'rgba(255,255,255,0.5)' }}>From real inventory data</div>
                             </div>
-                            <div className="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center text-success">
+                            <div style={{ width:40, height:40, borderRadius:12, background:'rgba(0,207,255,0.12)', border:'1px solid rgba(0,207,255,0.2)', color:'#00cfff', display:'flex', alignItems:'center', justifyContent:'center' }}>
                                 <DatabaseIcon size={20} />
                             </div>
                         </div>
-                    </Card>
+                    </div>
 
-                    <Card glass className="group hover:border-warning/30 transition-all">
-                        <div className="flex items-center justify-between">
+                    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, padding:24, position:'relative', overflow:'hidden' }}>
+                        <div style={{ position:'absolute', top:0, left:0, width:'100%', height:'100%', background:'radial-gradient(circle at top right, rgba(251,191,36,0.05), transparent 60%)' }}></div>
+                        <div style={{ position:'relative', zIndex:1, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                             <div>
-                                <p className="text-xs text-muted uppercase tracking-wider">Low Stock Items</p>
-                                <h3 className="text-2xl font-bold mt-1 text-warning">{summary?.low_stock_count || 0}</h3>
-                                <p className="text-xs text-muted mt-1">From ML predictions</p>
+                                <p style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Low Stock Items</p>
+                                <h3 style={{ fontSize:28, fontWeight:800, color:'#fbbf24', margin:'8px 0 4px 0', letterSpacing:'-0.02em' }}>{summary?.low_stock_count || 0}</h3>
+                                <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)' }}>From ML predictions</p>
                             </div>
-                            <div className="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center text-warning">
+                            <div style={{ width:40, height:40, borderRadius:12, background:'rgba(251,191,36,0.12)', border:'1px solid rgba(251,191,36,0.2)', color:'#fbbf24', display:'flex', alignItems:'center', justifyContent:'center' }}>
                                 <AlertIcon size={20} />
                             </div>
                         </div>
-                    </Card>
+                    </div>
 
-                    <Card glass className="group hover:border-error/30 transition-all">
-                        <div className="flex items-center justify-between">
+                    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, padding:24, position:'relative', overflow:'hidden' }}>
+                        <div style={{ position:'absolute', top:0, left:0, width:'100%', height:'100%', background:'radial-gradient(circle at top right, rgba(248,113,113,0.05), transparent 60%)' }}></div>
+                        <div style={{ position:'relative', zIndex:1, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                             <div>
-                                <p className="text-xs text-muted uppercase tracking-wider">Critical Stock</p>
-                                <h3 className="text-2xl font-bold mt-1 text-error">{summary?.critical_stock_count || 0}</h3>
-                                <p className="text-xs text-muted mt-1">Needs immediate action</p>
+                                <p style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Critical Stock</p>
+                                <h3 style={{ fontSize:28, fontWeight:800, color:'#f87171', margin:'8px 0 4px 0', letterSpacing:'-0.02em' }}>{summary?.critical_stock_count || 0}</h3>
+                                <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)' }}>Needs immediate action</p>
                             </div>
-                            <div className="w-10 h-10 bg-error/10 rounded-lg flex items-center justify-center text-error">
+                            <div style={{ width:40, height:40, borderRadius:12, background:'rgba(248,113,113,0.12)', border:'1px solid rgba(248,113,113,0.2)', color:'#f87171', display:'flex', alignItems:'center', justifyContent:'center' }}>
                                 <TrendingDownIcon size={20} />
                             </div>
                         </div>
-                    </Card>
+                    </div>
 
-                    <Card glass className="group hover:border-info/30 transition-all">
-                        <div className="flex items-center justify-between">
+                    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, padding:24, position:'relative', overflow:'hidden' }}>
+                        <div style={{ position:'absolute', top:0, left:0, width:'100%', height:'100%', background:'radial-gradient(circle at top right, rgba(99,102,241,0.05), transparent 60%)' }}></div>
+                        <div style={{ position:'relative', zIndex:1, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                             <div>
-                                <p className="text-xs text-muted uppercase tracking-wider">Products Tracked</p>
-                                <h3 className="text-2xl font-bold mt-1">{summary?.total_products || 0}</h3>
-                                <p className="text-xs text-muted mt-1">TFT+GNN Model</p>
+                                <p style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Products Tracked</p>
+                                <h3 style={{ fontSize:28, fontWeight:800, color:'#fff', margin:'8px 0 4px 0', letterSpacing:'-0.02em' }}>{summary?.total_products || 0}</h3>
+                                <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)' }}>TFT+GNN Model</p>
                             </div>
-                            <div className="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center text-info">
+                            <div style={{ width:40, height:40, borderRadius:12, background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.2)', color:'#818cf8', display:'flex', alignItems:'center', justifyContent:'center' }}>
                                 <ChartIcon size={20} />
                             </div>
                         </div>
-                    </Card>
+                    </div>
                 </div>
 
                 {/* Main Content Grid */}
@@ -535,70 +524,73 @@ export default function ManagerDashboard() {
                     <InventoryByStore inventoryByStore={inventoryByStore} onManage={() => setShowRebalancingModal(true)} />
                 </div>
 
-                {/* PO Creation Modal */}
-                <PurchaseOrderModal
-                    showPOModal={showPOModal}
-                    setShowPOModal={setShowPOModal}
-                    alerts={alerts}
-                    forecasts={dropdownProductOptions}
-                    poItems={poItems}
-                    setPOItems={setPOItems}
-                    poNotes={poNotes}
-                    setPONotes={setPONotes}
-                    handleCreatePO={async () => {
-                        if (poItems.length === 0) {
-                            alert('Please add at least one item to the PO');
-                            return;
-                        }
-                        const userData = localStorage.getItem('user');
-                        if (!userData) return;
-                        const parsedUser = JSON.parse(userData);
-                        const storeId = parsedUser.store_id || selectedStore || 'S1';
-                        try {
-                            const res = await fetch(`${API_URL}/api/purchase-orders/`, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    ...getAuthHeaders(),
-                                },
-                                body: JSON.stringify({
-                                    store_id: storeId,
-                                    created_by_user_id: parsedUser.id,
-                                    items: poItems,
-                                    notes: poNotes || null,
-                                    expected_delivery_date: null
-                                })
-                            });
-                            if (res.ok) {
-                                const newPO = await res.json();
-                                setPurchaseOrders([newPO, ...purchaseOrders]);
-                                setShowPOModal(false);
-                                setPOItems([]);
-                                setPONotes('');
-                                alert(`Purchase Order ${newPO.po_number} created successfully!`);
-                            } else {
-                                const error = await res.json();
-                                alert(`Failed to create PO: ${error.detail || 'Unknown error'}`);
-                            }
-                        } catch (error) {
-                            console.error('Failed to create PO:', error);
-                            alert('Failed to create purchase order');
-                        }
-                    }}
-                />
+                </div>
 
-                <RebalancingWorkflowModal
-                    showModal={showRebalancingModal}
-                    setShowModal={setShowRebalancingModal}
-                    inventoryByStore={inventoryByStore}
-                    forecasts={dropdownProductOptions}
-                    userStore={userStore}
-                    selectedStore={selectedStore}
-                    apiUrl={API_URL}
-                    getAuthHeaders={getAuthHeaders}
-                    onPlanCreated={() => fetchForecastData(selectedStore || undefined)}
-                />
-            </div>
+        
+            {/* PO Creation Modal - outside content wrapper so it covers full viewport */}
+            <PurchaseOrderModal
+                showPOModal={showPOModal}
+                setShowPOModal={setShowPOModal}
+                alerts={alerts}
+                forecasts={dropdownProductOptions}
+                poItems={poItems}
+                setPOItems={setPOItems}
+                poNotes={poNotes}
+                setPONotes={setPONotes}
+                handleCreatePO={async () => {
+                    if (poItems.length === 0) {
+                        alert('Please add at least one item to the PO');
+                        return;
+                    }
+                    const userData = localStorage.getItem('user');
+                    if (!userData) return;
+                    const parsedUser = JSON.parse(userData);
+                    const storeId = parsedUser.store_id || selectedStore || 'S1';
+                    try {
+                        const res = await fetch(`${API_URL}/api/purchase-orders/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...getAuthHeaders(),
+                            },
+                            body: JSON.stringify({
+                                store_id: storeId,
+                                created_by_user_id: parsedUser.id,
+                                items: poItems,
+                                notes: poNotes || null,
+                                expected_delivery_date: null
+                            })
+                        });
+                        if (res.ok) {
+                            const newPO = await res.json();
+                            setPurchaseOrders([newPO, ...purchaseOrders]);
+                            setShowPOModal(false);
+                            setPOItems([]);
+                            setPONotes('');
+                            alert(`Purchase Order ${newPO.po_number} created successfully!`);
+                        } else {
+                            const error = await res.json();
+                            alert(`Failed to create PO: ${error.detail || 'Unknown error'}`);
+                        }
+                    } catch (error) {
+                        console.error('Failed to create PO:', error);
+                        alert('Failed to create purchase order');
+                    }
+                }}
+            />
+
+            <RebalancingWorkflowModal
+                showModal={showRebalancingModal}
+                setShowModal={setShowRebalancingModal}
+                inventoryByStore={inventoryByStore}
+                forecasts={dropdownProductOptions}
+                userStore={userStore}
+                selectedStore={selectedStore}
+                apiUrl={API_URL}
+                getAuthHeaders={getAuthHeaders}
+                onPlanCreated={() => fetchForecastData(selectedStore || undefined)}
+            />
         </div>
     );
 }
+    

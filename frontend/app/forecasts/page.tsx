@@ -62,6 +62,8 @@ export default function ForecastsPage() {
     const router = useRouter();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
 
     // Filters
     const [categories, setCategories] = useState<Category[]>([]);
@@ -246,203 +248,230 @@ export default function ForecastsPage() {
     const { actualPath, forecastPath, points, maxValue, minValue } = generateChartPath();
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div style={{ minHeight: '100vh', background: '#060610', color: '#e8e8f0', fontFamily: "'Inter',system-ui,sans-serif" }}>
             {/* Navigation */}
-            <nav className="glass border-b border-white/10 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-8">
-                            <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center shadow-lg">
-                                    <TrendingUpIcon className="text-white" size={24} />
-                                </div>
-                                <span className="text-xl font-bold gradient-text">StockSensePro</span>
+            <nav style={{ position: 'sticky', top: 0, zIndex: 50, height: 64, display: 'flex', alignItems: 'center', background: 'rgba(6,6,16,0.85)', backdropFilter: 'blur(24px) saturate(160%)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 2rem' }}>
+                <div style={{ maxWidth: 1280, margin: '0 auto', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg,#00cfff,#6366f1)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(0,207,255,0.3)' }}>
+                                <TrendingUpIcon className="text-white" size={20} />
                             </div>
-                            <div className="hidden md:flex items-center gap-1">
-                                <button onClick={() => router.push('/manager')} className="px-4 py-2 rounded-lg text-sm font-medium text-muted hover:text-foreground hover:bg-white/5">
-                                    Dashboard
-                                </button>
-                                <button className="px-4 py-2 rounded-lg text-sm font-medium bg-secondary/20 text-secondary">
-                                    Forecasts
-                                </button>
-                            </div>
+                            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.025em', color: '#fff' }}>StockSense</span>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => fetchProductDetail()} className="p-2 hover:bg-white/5 rounded-lg">
-                                <RefreshIcon className={`text-muted ${chartLoading ? 'animate-spin' : ''}`} size={18} />
+                        <div className="hidden md:flex items-center gap-4">
+                            <button
+                                onClick={() => router.push('/manager')}
+                                style={{ padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: 'transparent', color: 'rgba(255,255,255,0.45)' }}
+                                onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
+                            >
+                                Dashboard
                             </button>
-                            <button onClick={handleLogout} className="p-2 hover:bg-white/5 rounded-lg">
-                                <LogoutIcon className="text-muted hover:text-error" size={18} />
+                            <button
+                                style={{ padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: 'rgba(0,207,255,0.1)', color: '#00cfff', boxShadow: '0 0 0 1px rgba(0,207,255,0.2)' }}
+                            >
+                                Forecasts
                             </button>
                         </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <button
+                            onClick={() => fetchProductDetail()}
+                            style={{ position: 'relative', padding: 8, background: 'transparent', border: 'none', cursor: 'pointer', borderRadius: 8 }}
+                            title="Refresh data"
+                        >
+                            <span style={{ color: 'rgba(255,255,255,0.4)' }}><RefreshIcon className={chartLoading ? 'animate-spin' : ''} size={18} /></span>
+                        </button>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 8 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #00cfff, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14 }}>
+                                {user?.name?.charAt(0) || user?.email?.charAt(0) || 'M'}
+                            </div>
+                            <div className="hidden md:block">
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{user?.name || 'Manager'}</div>
+                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{user?.email}</div>
+                            </div>
+                        </div>
+
+                        <button onClick={handleLogout} style={{ padding: 8, marginLeft: 8, background: 'transparent', border: 'none', cursor: 'pointer', borderRadius: 8, color: 'rgba(255,255,255,0.35)', transition: 'color 0.2s' }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#f87171')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}>
+                            <LogoutIcon size={17} />
+                        </button>
                     </div>
                 </div>
             </nav>
 
-            <div className="max-w-7xl mx-auto px-6 py-8">
+            <div style={{
+                marginRight: drawerOpen ? 380 : 0,
+                transition: 'margin-right 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                padding: '2rem 2rem',
+            }}>
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">
-                        <span className="gradient-text">Demand Forecasts</span>
+                <div style={{ marginBottom: 32 }}>
+                    <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff', marginBottom: 8 }}>
+                        Demand Forecasts
                     </h1>
-                    <p className="text-muted text-sm">
-                        View <span className="text-cyan-400">real 2023-2024 transaction data</span> and ML-generated forecasts with per-product confidence scores
+                    <p style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.45)', fontSize: 14 }}>
+                        View <span style={{ color: '#00cfff' }}>real 2023-2024 transaction data</span> and ML-generated forecasts with per-product confidence scores
                     </p>
                 </div>
 
                 {/* Filters */}
-                <Card glass className="mb-8">
-                    <CardContent className="p-6">
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                            {/* Category Filter */}
-                            <div>
-                                <label className="block text-xs text-muted mb-2">Category</label>
-                                <select
-                                    value={selectedCategory}
-                                    onChange={(e) => {
-                                        setSelectedCategory(e.target.value);
-                                        setSelectedProduct('');
-                                    }}
-                                    className="w-full !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-3 text-sm focus:ring-1 focus:ring-secondary outline-none"
-                                >
-                                    <option value="">All Categories</option>
-                                    {categories.map(cat => (
-                                        <option key={cat.code} value={cat.code}>
-                                            {cat.name} ({cat.product_count})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Product Filter */}
-                            <div className="col-span-2">
-                                <label className="block text-xs text-muted mb-2">Product</label>
-                                <select
-                                    value={selectedProduct}
-                                    onChange={(e) => setSelectedProduct(e.target.value)}
-                                    className="w-full !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-3 text-sm focus:ring-1 focus:ring-secondary outline-none"
-                                >
-                                    {products.map(prod => (
-                                        <option key={prod.sku} value={prod.sku}>
-                                            {prod.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Store Filter */}
-                            <div>
-                                <label className="block text-xs text-muted mb-2">Store</label>
-                                <select
-                                    value={selectedStore}
-                                    onChange={(e) => setSelectedStore(e.target.value)}
-                                    className="w-full !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-3 text-sm focus:ring-1 focus:ring-secondary outline-none"
-                                >
-                                    <option value="S1">Store S1</option>
-                                    <option value="S2">Store S2</option>
-                                    <option value="S3">Store S3</option>
-                                </select>
-                            </div>
-
-                            {/* History Days */}
-                            <div>
-                                <label className="block text-xs text-muted mb-2">History</label>
-                                <select
-                                    value={historyDays}
-                                    onChange={(e) => setHistoryDays(Number(e.target.value))}
-                                    className="w-full !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-3 text-sm focus:ring-1 focus:ring-secondary outline-none"
-                                >
-                                    <option value={7}>7 days</option>
-                                    <option value={14}>14 days</option>
-                                    <option value={30}>30 days</option>
-                                    <option value={60}>60 days</option>
-                                    <option value={90}>90 days</option>
-                                </select>
-                            </div>
-
-                            {/* Forecast Days */}
-                            <div>
-                                <label className="block text-xs text-muted mb-2">Forecast</label>
-                                <select
-                                    value={forecastDays}
-                                    onChange={(e) => setForecastDays(Number(e.target.value))}
-                                    className="w-full !bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-lg py-2 px-3 text-sm focus:ring-1 focus:ring-secondary outline-none"
-                                >
-                                    <option value={7}>7 days</option>
-                                    <option value={14}>14 days</option>
-                                    <option value={30}>30 days</option>
-                                </select>
-                            </div>
+                <div style={{ background: 'rgba(6,6,16,0.6)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24, marginBottom: 32 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16 }}>
+                        <div>
+                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Category</label>
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => {
+                                    setSelectedCategory(e.target.value);
+                                    setSelectedProduct('');
+                                }}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
+                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
+                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
+                            >
+                                <option value="" style={{ background: '#0d0d1a' }}>All Categories</option>
+                                {categories.map(cat => (
+                                    <option key={cat.code} value={cat.code} style={{ background: '#0d0d1a' }}>
+                                        {cat.name} ({cat.product_count})
+                                    </option>
+                                ))}
+                            </select>
                         </div>
-                    </CardContent>
-                </Card>
+                        <div style={{ gridColumn: 'span 2' }}>
+                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Product</label>
+                            <select
+                                value={selectedProduct}
+                                onChange={(e) => setSelectedProduct(e.target.value)}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
+                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
+                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
+                            >
+                                {products.map(prod => (
+                                    <option key={prod.sku} value={prod.sku} style={{ background: '#0d0d1a' }}>
+                                        {prod.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Store</label>
+                            <select
+                                value={selectedStore}
+                                onChange={(e) => setSelectedStore(e.target.value)}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
+                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
+                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
+                            >
+                                <option value="S1" style={{ background: '#0d0d1a' }}>Store S1</option>
+                                <option value="S2" style={{ background: '#0d0d1a' }}>Store S2</option>
+                                <option value="S3" style={{ background: '#0d0d1a' }}>Store S3</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>History</label>
+                            <select
+                                value={historyDays}
+                                onChange={(e) => setHistoryDays(Number(e.target.value))}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
+                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
+                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
+                            >
+                                <option value={7} style={{ background: '#0d0d1a' }}>7 days</option>
+                                <option value={14} style={{ background: '#0d0d1a' }}>14 days</option>
+                                <option value={30} style={{ background: '#0d0d1a' }}>30 days</option>
+                                <option value={60} style={{ background: '#0d0d1a' }}>60 days</option>
+                                <option value={90} style={{ background: '#0d0d1a' }}>90 days</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Forecast</label>
+                            <select
+                                value={forecastDays}
+                                onChange={(e) => setForecastDays(Number(e.target.value))}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
+                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
+                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
+                            >
+                                <option value={7} style={{ background: '#0d0d1a' }}>7 days</option>
+                                <option value={14} style={{ background: '#0d0d1a' }}>14 days</option>
+                                <option value={30} style={{ background: '#0d0d1a' }}>30 days</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Product Info Cards */}
                 {productDetail && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                        <Card glass>
-                            <CardContent className="p-4">
-                                <p className="text-xs text-muted uppercase">Current Stock</p>
-                                <h3 className="text-2xl font-bold mt-1">{productDetail.current_stock}</h3>
-                                <p className="text-xs text-muted">units</p>
-                            </CardContent>
-                        </Card>
-                        <Card glass>
-                            <CardContent className="p-4">
-                                <p className="text-xs text-muted uppercase">{forecastDays}-Day Forecast</p>
-                                <h3 className="text-2xl font-bold mt-1">{productDetail.seven_day_forecast}</h3>
-                                <p className="text-xs text-muted">predicted demand</p>
-                            </CardContent>
-                        </Card>
-                        <Card glass>
-                            <CardContent className="p-4">
-                                <p className="text-xs text-muted uppercase">Days of Stock</p>
-                                <h3 className={`text-2xl font-bold mt-1 ${productDetail.stock_days_remaining < 7 ? 'text-error' : 'text-success'}`}>
-                                    {productDetail.stock_days_remaining}
-                                </h3>
-                                <p className="text-xs text-muted">remaining</p>
-                            </CardContent>
-                        </Card>
-                        <Card glass>
-                            <CardContent className="p-4">
-                                <p className="text-xs text-muted uppercase">Status</p>
-                                <div className="mt-2">{getStatusBadge(productDetail.stock_status)}</div>
-                            </CardContent>
-                        </Card>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 24, marginBottom: 32 }}>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'radial-gradient(circle at top right, rgba(0,207,255,0.05), transparent 60%)' }}></div>
+                            <div style={{ position: 'relative', zIndex: 1 }}>
+                                <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Stock</p>
+                                <h3 style={{ fontSize: 28, fontWeight: 800, color: '#fff', margin: '8px 0 4px 0', letterSpacing: '-0.02em' }}>{productDetail.current_stock}</h3>
+                                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>units</p>
+                            </div>
+                        </div>
+
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'radial-gradient(circle at top right, rgba(99,102,241,0.05), transparent 60%)' }}></div>
+                            <div style={{ position: 'relative', zIndex: 1 }}>
+                                <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{forecastDays}-Day Forecast</p>
+                                <h3 style={{ fontSize: 28, fontWeight: 800, color: '#818cf8', margin: '8px 0 4px 0', letterSpacing: '-0.02em' }}>{productDetail.seven_day_forecast}</h3>
+                                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>predicted demand</p>
+                            </div>
+                        </div>
+
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: `radial-gradient(circle at top right, ${productDetail.stock_days_remaining < 7 ? 'rgba(248,113,113,0.05)' : 'rgba(0,207,255,0.05)'}, transparent 60%)` }}></div>
+                            <div style={{ position: 'relative', zIndex: 1 }}>
+                                <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Days of Stock</p>
+                                <h3 style={{ fontSize: 28, fontWeight: 800, color: productDetail.stock_days_remaining < 7 ? '#f87171' : '#00cfff', margin: '8px 0 4px 0', letterSpacing: '-0.02em' }}>{productDetail.stock_days_remaining}</h3>
+                                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>remaining</p>
+                            </div>
+                        </div>
+
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'radial-gradient(circle at top right, rgba(255,255,255,0.02), transparent 60%)' }}></div>
+                            <div style={{ position: 'relative', zIndex: 1 }}>
+                                <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</p>
+                                <div style={{ marginTop: 12 }}>{getStatusBadge(productDetail.stock_status)}</div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* Chart */}
-                <Card glass className="mb-8">
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="flex items-center gap-2">
-                                    <ChartIcon size={18} className="text-primary" />
-                                    {productDetail?.product_name || 'Select a product'}
-                                </CardTitle>
-                                <CardDescription className="flex items-center gap-2">
-                                    {productDetail?.category_name} • {selectedStore}
-                                    {productDetail?.data_source && (
-                                        <Badge variant={productDetail.data_source.includes('real') ? 'success' : 'default'} className="text-xs">
-                                            {productDetail.data_source}
-                                        </Badge>
-                                    )}
-                                </CardDescription>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-0.5 bg-cyan-400"></div>
-                                    <span className="text-muted">Historical</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-0.5 bg-pink-500" style={{ strokeDasharray: '4 4' }}></div>
-                                    <span className="text-muted">Forecast</span>
-                                </div>
+                <div style={{ background: 'rgba(6,6,16,0.6)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden', marginBottom: 32 }}>
+                    <div style={{ padding: 24, borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ color: '#00cfff', display: 'flex' }}><ChartIcon size={18} /></span>
+                                {productDetail?.product_name || 'Select a product'}
+                            </h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'rgba(255,255,255,0.45)' }}>
+                                {productDetail?.category_name} • {selectedStore}
+                                {productDetail?.data_source && (
+                                    <Badge variant={productDetail.data_source.includes('real') ? 'success' : 'default'} className="text-xs">
+                                        {productDetail.data_source}
+                                    </Badge>
+                                )}
                             </div>
                         </div>
-                    </CardHeader>
-                    <CardContent>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 13 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 16, height: 2, background: '#00cfff' }}></div>
+                                <span style={{ color: 'rgba(255,255,255,0.45)' }}>Historical</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 16, height: 2, background: '#ec4899', borderBottom: '2px dashed #ec4899' }}></div>
+                                <span style={{ color: 'rgba(255,255,255,0.45)' }}>Forecast</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ padding: 24 }}>
                         {chartLoading ? (
                             <div className="h-80 flex items-center justify-center text-muted">
                                 Loading chart data...
@@ -585,36 +614,42 @@ export default function ForecastsPage() {
                                 Select a product to view demand data
                             </div>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
 
                 {/* Product List */}
-                <Card glass>
-                    <CardHeader>
-                        <CardTitle>Products in {categories.find(c => c.code === selectedCategory)?.name || 'All Categories'}</CardTitle>
-                        <CardDescription>Click on a product to view its forecast</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div style={{ background: 'rgba(6,6,16,0.6)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden', marginBottom: 32 }}>
+                    <div style={{ padding: 24, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Products in {categories.find(c => c.code === selectedCategory)?.name || 'All Categories'}</h3>
+                        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)' }}>Click on a product to view its forecast</p>
+                    </div>
+                    <div style={{ padding: 24 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
                             {products.map(product => (
                                 <div
                                     key={product.sku}
                                     onClick={() => setSelectedProduct(product.sku)}
-                                    className={`p-4 rounded-lg border cursor-pointer transition-all ${selectedProduct === product.sku
-                                        ? 'border-secondary bg-secondary/10'
-                                        : 'border-white/10 hover:border-white/20 bg-white/5'
-                                        }`}
+                                    style={{
+                                        padding: 16,
+                                        borderRadius: 12,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        border: selectedProduct === product.sku ? '1px solid rgba(0,207,255,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                                        background: selectedProduct === product.sku ? 'rgba(0,207,255,0.05)' : 'rgba(255,255,255,0.02)'
+                                    }}
+                                    onMouseEnter={e => { if (selectedProduct !== product.sku) e.currentTarget.style.border = '1px solid rgba(255,255,255,0.15)' }}
+                                    onMouseLeave={e => { if (selectedProduct !== product.sku) e.currentTarget.style.border = '1px solid rgba(255,255,255,0.06)' }}
                                 >
-                                    <div className="font-medium text-sm">{product.name}</div>
-                                    <div className="text-xs text-muted font-mono mt-1">{product.sku}</div>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: selectedProduct === product.sku ? '#00cfff' : '#fff', marginBottom: 4 }}>{product.name}</div>
+                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>{product.sku}</div>
                                 </div>
                             ))}
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
 
                 {/* LLM Assistant */}
-                <InsightAssistant productDetail={productDetail} />
+                <InsightAssistant productDetail={productDetail} onDrawerChange={setDrawerOpen} />
             </div>
         </div>
     );

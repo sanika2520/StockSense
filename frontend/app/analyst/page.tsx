@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -21,6 +22,7 @@ import {
     DatabaseIcon,
     RefreshIcon,
     CalendarIcon,
+    ShieldIcon,
 } from '@/components/ui/Icons';
 import AnalysisView from './components/AnalysisView';
 import ProductAccuracyTable from './components/ProductAccuracyTable';
@@ -120,14 +122,12 @@ export default function AnalystDashboard() {
         setUser(parsed);
         setLoading(false);
 
-        // Fetch model metrics and GNN stats
         fetchModelMetrics();
         fetchGNNStats();
         fetchStockoutCount();
         fetchAnomaliesSummary();
     }, [router]);
 
-    // Close export menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (showExportMenu) {
@@ -137,7 +137,6 @@ export default function AnalystDashboard() {
                 }
             }
         };
-
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showExportMenu]);
@@ -149,7 +148,6 @@ export default function AnalystDashboard() {
             });
             if (response.ok) {
                 const data = await response.json();
-                // Deduplicate by SKU — count unique SKUs at risk
                 const uniqueSkus = new Set(data.map((r: any) => r.sku));
                 setStockoutCount(uniqueSkus.size);
             }
@@ -187,7 +185,6 @@ export default function AnalystDashboard() {
             }
         } catch (error) {
             console.error('Error fetching model metrics:', error);
-            // Fall back to mock data (already set)
         } finally {
             setMetricsLoading(false);
         }
@@ -212,7 +209,6 @@ export default function AnalystDashboard() {
 
     const handleExportReport = async () => {
         try {
-            // Download full analysis report
             const response = await fetch(`${API_URL}/analytics/export/full-analysis`, {
                 headers: getAuthHeaders(),
             });
@@ -288,7 +284,6 @@ export default function AnalystDashboard() {
     const runSimulation = async () => {
         setSimulationLoading(true);
         try {
-            // POST /simulations/run with no body → backend returns default scenarios using live DB data
             const response = await fetch(`${API_URL}/simulations/run`, {
                 method: 'POST',
                 headers: {
@@ -319,7 +314,6 @@ export default function AnalystDashboard() {
         }
         setSimulationLoading(true);
         try {
-            // POST /simulations/custom?scenario_text=... → AI + GNN powered analysis
             const params = new URLSearchParams({ scenario_text: customScenario });
             if (user?.store_id) {
                 params.set('store_id', user.store_id.toUpperCase());
@@ -353,11 +347,7 @@ export default function AnalystDashboard() {
     };
 
     const handleChatScenario = (result: any) => {
-        // Add chat-analyzed scenario to simulation results
-        setSimulationResults(prev => [
-            result,
-            ...prev.slice(0, 3)  // Keep top 3 default scenarios
-        ]);
+        setSimulationResults(prev => [result, ...prev.slice(0, 3)]);
     };
 
     const handleLogout = () => {
@@ -368,7 +358,7 @@ export default function AnalystDashboard() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-background">
+            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#060610' }}>
                 <div className="animate-pulse text-2xl font-bold gradient-text">Loading Analyst Dashboard...</div>
             </div>
         );
@@ -397,218 +387,278 @@ export default function AnalystDashboard() {
         }
     };
 
+    const tabs = [
+        { key: 'overview', label: 'Overview' },
+        { key: 'analysis', label: 'Analysis' },
+        { key: 'forecasts', label: 'Forecasts' },
+        { key: 'gnn', label: 'GNN Insights' },
+    ];
+
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            {/* Navigation */}
-            <nav className="glass border-b border-white/10 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-8">
-                            <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 bg-gradient-to-br from-cyan-600 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-info/20">
-                                    <TrendingUpIcon className="text-white" size={24} />
-                                </div>
-                                <span className="text-xl font-bold gradient-text">StockSensePro</span>
+        <div style={{ minHeight: '100vh', background: '#060610', color: '#e8e8f0', fontFamily: "'Inter', system-ui, sans-serif" }}>
+
+            {/* Nav — matches Admin Dashboard exactly */}
+            <nav style={{ position: 'sticky', top: 0, zIndex: 50, height: 64, display: 'flex', alignItems: 'center', background: 'rgba(6,6,16,0.85)', backdropFilter: 'blur(24px) saturate(160%)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 2rem' }}>
+                <div style={{ maxWidth: 1280, margin: '0 auto', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+
+                    {/* Left: logo + tabs */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+                        {/* Logo */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg,#00cfff,#6366f1)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(0,207,255,0.3)' }}>
+                                <TrendingUpIcon className="text-white" size={20} />
                             </div>
-                            <div className="hidden md:flex items-center gap-1">
-                                {['overview', 'analysis', 'forecasts', 'gnn'].map((tab) => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => setActiveTab(tab)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab
-                                            ? 'bg-info/20 text-info'
-                                            : 'text-muted hover:text-foreground hover:bg-white/5'
-                                            }`}
-                                    >
-                                        {tab === 'gnn' ? 'GNN Insights' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                                    </button>
-                                ))}
+                            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.025em', color: '#fff' }}>StockSense</span>
+                        </div>
+
+                        {/* Tabs */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {tabs.map(({ key, label }) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setActiveTab(key)}
+                                    style={{
+                                        padding: '6px 16px',
+                                        borderRadius: 8,
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        textDecoration: 'none',
+                                        transition: 'all 0.2s',
+                                        background: activeTab === key ? 'rgba(0,207,255,0.1)' : 'transparent',
+                                        color: activeTab === key ? '#00cfff' : 'rgba(255,255,255,0.45)',
+                                        boxShadow: activeTab === key ? '0 0 0 1px rgba(0,207,255,0.2)' : 'none',
+                                    }}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Right: search + bell + user + logout */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {/* Search */}
+                        <div style={{ position: 'relative' }}>
+                            <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)' }}>
+                                <SearchIcon size={14} />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search forecasts..."
+                                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '5px 14px 5px 30px', fontSize: 12, color: '#e8e8f0', outline: 'none', width: 160, transition: 'width 0.2s' }}
+                                onFocus={e => (e.currentTarget.style.width = '220px')}
+                                onBlur={e => (e.currentTarget.style.width = '160px')}
+                            />
+                        </div>
+
+                        {/* Bell */}
+                        <button style={{ position: 'relative', padding: 8, background: 'transparent', border: 'none', cursor: 'pointer', borderRadius: 8 }}>
+                            <span style={{ color: 'rgba(255,255,255,0.4)' }}><BellIcon size={18} /></span>
+                            <span style={{ position: 'absolute', top: 8, right: 8, width: 6, height: 6, background: '#ef4444', borderRadius: '50%' }}></span>
+                        </button>
+
+                        {/* User info */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#00cfff,#6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', boxShadow: '0 0 12px rgba(0,207,255,0.25)' }}>
+                                {user.name ? user.name[0] : user.email[0].toUpperCase()}
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{user.name || user.email}</div>
+                                <div style={{ fontSize: 11, color: '#00cfff', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <ChartIcon size={9} /> Analyst
+                                </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <div className="relative hidden sm:block">
-                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
-                                <input
-                                    type="text"
-                                    placeholder="Search forecasts..."
-                                    className="!bg-[#1a1a24] !text-[#e8e8f0] border border-white/10 rounded-full py-1.5 pl-9 pr-4 text-xs focus:ring-1 focus:ring-info outline-none transition-all w-40 focus:w-56 shadow-inner"
-                                />
-                            </div>
-                            <button className="p-2 hover:bg-white/5 rounded-lg transition-colors relative">
-                                <BellIcon className="text-muted" size={20} />
-                            </button>
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white">
-                                    {user.name ? user.name[0] : user.email[0].toUpperCase()}
-                                </div>
-                                <div className="hidden sm:block">
-                                    <div className="text-sm font-medium">{user.name || user.email}</div>
-                                    <div className="text-xs text-info flex items-center gap-1">
-                                        <ChartIcon size={10} /> Analyst
-                                    </div>
-                                </div>
-                            </div>
-                            <button onClick={handleLogout} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-                                <LogoutIcon className="text-muted hover:text-error" size={18} />
-                            </button>
-                        </div>
+
+                        {/* Logout */}
+                        <button
+                            onClick={handleLogout}
+                            style={{ padding: 8, background: 'transparent', border: 'none', cursor: 'pointer', borderRadius: 8, color: 'rgba(255,255,255,0.35)', transition: 'color 0.2s' }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}
+                        >
+                            <LogoutIcon size={17} />
+                        </button>
                     </div>
                 </div>
             </nav>
 
-            <div className="max-w-7xl mx-auto px-6 py-8">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+            {/* Page content */}
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '2rem 2rem' }} className="space-y-6">
+
+                {/* Page Header */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4" style={{ marginBottom: 8 }}>
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight mb-2">
-                            Analytics <span className="gradient-text">Dashboard</span>
+                        <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>
+                            Analytics Dashboard
                         </h1>
-                        <p className="text-muted text-sm flex items-center gap-2">
-                            <ChartIcon size={14} className="text-info" />
+                        <p style={{ color: 'rgba(232,232,240,0.6)', marginTop: 4, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ color: '#818cf8' }}>
+                                <ChartIcon size={14} />
+                            </span>
                             Forecast Analysis & Model Insights
-                            <span className="w-1 h-1 bg-white/20 rounded-full"></span>
-                            <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                            <span style={{ width: 4, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'inline-block' }} />
+                            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="sm" onClick={fetchModelMetrics} disabled={metricsLoading}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {/* Refresh button — ghost style */}
+                        <button
+                            onClick={fetchModelMetrics}
+                            disabled={metricsLoading}
+                            style={{ whiteSpace: 'nowrap', height: 44, padding: '0 20px', borderRadius: 10, fontSize: 14, fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff', cursor: metricsLoading ? 'not-allowed' : 'pointer', transition: 'all 0.2s', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', gap: 8 }}
+                            onMouseEnter={e => { if (!metricsLoading) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; } }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
+                        >
                             <RefreshIcon size={14} className={metricsLoading ? 'animate-spin' : ''} />
                             Refresh Data
-                        </Button>
+                        </button>
+
+                        {/* Export — primary CTA style */}
                         <div className="relative export-menu-container">
-                            <Button
-                                variant="primary"
-                                size="sm"
+                            <button
                                 onClick={() => setShowExportMenu(!showExportMenu)}
+                                style={{ whiteSpace: 'nowrap', height: 44, padding: '0 24px', borderRadius: 10, fontSize: 14, fontWeight: 700, border: 'none', background: 'linear-gradient(135deg, #00cfff, #6366f1)', color: '#fff', cursor: 'pointer', boxShadow: '0 0 20px rgba(0,207,255,0.3)', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 8 }}
+                                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 24px rgba(0,207,255,0.5)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 20px rgba(0,207,255,0.3)'; e.currentTarget.style.transform = 'translateY(0)'; }}
                             >
                                 <DatabaseIcon size={14} />
                                 Export Report
-                            </Button>
+                            </button>
                             {showExportMenu && (
-                                <div className="absolute right-0 mt-2 w-64 glass border border-white/10 rounded-lg shadow-xl z-50">
-                                    <div className="p-2">
+                                <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 256, background: 'rgba(6,6,16,0.95)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, boxShadow: '0 20px 40px rgba(0,0,0,0.6)', zIndex: 50, padding: 8 }}>
+                                    {[
+                                        { label: 'Full Analysis Report', sub: 'All metrics + volume stats', fn: handleExportReport },
+                                        { label: 'Model Performance', sub: 'MAE, MAPE, WAPE by SKU', fn: handleExportModelPerformance },
+                                        { label: 'Volume Statistics', sub: 'SKU demand patterns', fn: handleExportVolumeStats },
+                                    ].map(({ label, sub, fn }) => (
                                         <button
-                                            onClick={handleExportReport}
-                                            className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-white/5 transition-colors"
+                                            key={label}
+                                            onClick={fn}
+                                            style={{ width: '100%', textAlign: 'left', padding: '8px 12px', borderRadius: 8, background: 'transparent', border: 'none', cursor: 'pointer', color: '#e8e8f0', transition: 'background 0.2s' }}
+                                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                         >
-                                            <div className="font-medium">Full Analysis Report</div>
-                                            <div className="text-xs text-muted">All metrics + volume stats</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+                                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>{sub}</div>
                                         </button>
-                                        <button
-                                            onClick={handleExportModelPerformance}
-                                            className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-white/5 transition-colors"
-                                        >
-                                            <div className="font-medium">Model Performance</div>
-                                            <div className="text-xs text-muted">MAE, MAPE, WAPE by SKU</div>
-                                        </button>
-                                        <button
-                                            onClick={handleExportVolumeStats}
-                                            className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-white/5 transition-colors"
-                                        >
-                                            <div className="font-medium">Volume Statistics</div>
-                                            <div className="text-xs text-muted">SKU demand patterns</div>
-                                        </button>
-                                    </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Analysis View Content */}
+                {/* Analysis tab */}
                 {activeTab === 'analysis' && (
-                    <div className="animate-in fade-in duration-300">
+                    <div className="animate-fadeIn">
                         <AnalysisView />
                     </div>
                 )}
 
-                {/* GNN 3D View Content */}
+                {/* GNN tab */}
                 {activeTab === 'gnn' && (
-                    <div className="animate-in fade-in duration-300">
+                    <div className="animate-fadeIn">
                         <GNN3DVisualizer />
                     </div>
                 )}
 
-                {/* Main Dashboard Content (Only show if NOT analysis or gnn tab) */}
+                {/* Overview / Forecasts tabs */}
                 {activeTab !== 'analysis' && activeTab !== 'gnn' && (
                     <>
-                        {/* Model Performance Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                            <Card glass className="group hover:border-info/30 transition-all">
-                                <div className="flex items-center justify-between">
+                        {/* Stat Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {/* Active Model */}
+                            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20, transition: 'all 0.3s ease' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(129,140,248,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div>
-                                        <p className="text-xs text-muted uppercase tracking-wider">Active Model</p>
-                                        <h3 className="text-xl font-bold mt-1 text-info">
+                                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Active Model</p>
+                                        <h3 style={{ fontSize: 22, fontWeight: 700, marginTop: 4, color: '#818cf8' }}>
                                             {modelMetrics.find(m => m.status === 'active')?.model.split(' ')[0] || 'TFT'}
                                         </h3>
-                                        <p className="text-xs text-muted mt-1">
+                                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>
                                             {modelMetrics.find(m => m.status === 'active')?.type.split(' ')[0] || 'Loading...'}
                                         </p>
                                     </div>
-                                    <div className="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center text-info">
+                                    <div style={{ width: 40, height: 40, background: 'rgba(129,140,248,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8' }}>
                                         <ActivityIcon size={20} />
                                     </div>
                                 </div>
-                            </Card>
+                            </div>
 
-                            <Card glass className="group hover:border-success/30 transition-all">
-                                <div className="flex items-center justify-between">
+                            {/* Avg MAPE */}
+                            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20, transition: 'all 0.3s ease' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div>
-                                        <p className="text-xs text-muted uppercase tracking-wider">Avg. MAPE</p>
-                                        <h3 className="text-2xl font-bold mt-1 text-success">
+                                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Avg. MAPE</p>
+                                        <h3 style={{ fontSize: 26, fontWeight: 700, marginTop: 4, color: '#34d399' }}>
                                             {modelMetrics.find(m => m.status === 'active')?.mape.toFixed(1) || '8.5'}%
                                         </h3>
-                                        <div className="flex items-center gap-1 mt-1">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                             {metricsLoading ? (
-                                                <span className="text-xs text-muted">Loading...</span>
+                                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>Loading...</span>
                                             ) : (
                                                 <>
-                                                    <TrendingDownIcon size={12} className="text-success" />
-                                                    <span className="text-xs text-success">Live Data</span>
+                                                    <span style={{ color: '#34d399' }}>
+                                                        <TrendingDownIcon size={12} />
+                                                    </span>
+                                                    <span style={{ fontSize: 11, color: '#34d399' }}>Live Data</span>
                                                 </>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center text-success">
+                                    <div style={{ width: 40, height: 40, background: 'rgba(52,211,153,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34d399' }}>
                                         <CheckIcon size={20} />
                                     </div>
                                 </div>
-                            </Card>
+                            </div>
 
-                            <Card glass className="group hover:border-warning/30 transition-all">
-                                <div className="flex items-center justify-between">
+                            {/* High-Risk Stockouts */}
+                            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20, transition: 'all 0.3s ease' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div>
-                                        <p className="text-xs text-muted uppercase tracking-wider">High-Risk Stockouts</p>
-                                        <h3 className="text-2xl font-bold mt-1 text-warning">
+                                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>High-Risk Stockouts</p>
+                                        <h3 style={{ fontSize: 26, fontWeight: 700, marginTop: 4, color: '#fbbf24' }}>
                                             {stockoutCount === null ? '—' : stockoutCount}
                                         </h3>
-                                        <p className="text-xs text-muted mt-1">
+                                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>
                                             {stockoutCount === null ? 'Loading...' : `${stockoutCount} SKUs at risk`}
                                         </p>
                                     </div>
-                                    <div className="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center text-warning">
+                                    <div style={{ width: 40, height: 40, background: 'rgba(251,191,36,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fbbf24' }}>
                                         <AlertIcon size={20} />
                                     </div>
                                 </div>
-                            </Card>
+                            </div>
 
-                            <Card glass className="group hover:border-primary/30 transition-all">
-                                <div className="flex items-center justify-between">
+                            {/* GNN Nodes */}
+                            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20, transition: 'all 0.3s ease' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,207,255,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div>
-                                        <p className="text-xs text-muted uppercase tracking-wider">GNN Nodes</p>
-                                        <h3 className="text-2xl font-bold mt-1">{gnnStats ? gnnStats.nodes.toLocaleString() : '—'}</h3>
-                                        <p className="text-xs text-muted mt-1">{gnnStats ? `${gnnStats.edges.toLocaleString()} edges` : 'Loading...'}</p>
+                                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>GNN Nodes</p>
+                                        <h3 style={{ fontSize: 26, fontWeight: 700, marginTop: 4 }}>{gnnStats ? gnnStats.nodes.toLocaleString() : '—'}</h3>
+                                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>{gnnStats ? `${gnnStats.edges.toLocaleString()} edges` : 'Loading...'}</p>
                                     </div>
-                                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
+                                    <div style={{ width: 40, height: 40, background: 'rgba(0,207,255,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00cfff' }}>
                                         <DatabaseIcon size={20} />
                                     </div>
                                 </div>
-                            </Card>
+                            </div>
                         </div>
 
-                        {/* Main Content Grid */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-                            {/* Model Comparison */}
+                        {/* Main Content Grid — Model Comparison + Anomalies */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Model Performance Comparison */}
                             <Card glass className="lg:col-span-2">
                                 <CardHeader>
                                     <div className="flex items-center justify-between">
@@ -654,9 +704,7 @@ export default function AnalystDashboard() {
                                                         <TableCell className="text-right font-mono">{model.mae.toFixed(2)}</TableCell>
                                                         <TableCell className="text-right font-mono">{model.mape.toFixed(1)}%</TableCell>
                                                         <TableCell className="text-right font-mono">{model.wape.toFixed(1)}%</TableCell>
-                                                        <TableCell className="text-right">
-                                                            {getStatusBadge(model.status)}
-                                                        </TableCell>
+                                                        <TableCell className="text-right">{getStatusBadge(model.status)}</TableCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>
@@ -674,13 +722,14 @@ export default function AnalystDashboard() {
                                             Detected Anomalies
                                         </CardTitle>
                                         {anomalies && anomalies.top_anomalies.length > 3 && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
+                                            <button
                                                 onClick={() => setShowAllAnomalies((prev) => !prev)}
+                                                style={{ height: 32, padding: '0 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff', cursor: 'pointer', transition: 'all 0.2s' }}
+                                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
+                                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
                                             >
                                                 {showAllAnomalies ? 'Show Top 3' : 'View All'}
-                                            </Button>
+                                            </button>
                                         )}
                                     </div>
                                 </CardHeader>
@@ -695,17 +744,17 @@ export default function AnalystDashboard() {
                                     ) : (
                                         <div className="space-y-4">
                                             <div className="grid grid-cols-2 gap-3">
-                                                <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
-                                                    <p className="text-xs text-muted uppercase tracking-wider">Flagged SKUs</p>
-                                                    <p className="text-xl font-bold text-warning mt-1">{anomalies.anomaly_count}</p>
+                                                <div style={{ padding: 12, borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                                                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Flagged SKUs</p>
+                                                    <p style={{ fontSize: 20, fontWeight: 700, color: '#fbbf24', marginTop: 4 }}>{anomalies.anomaly_count}</p>
                                                 </div>
-                                                <div className="p-3 rounded-lg bg-info/10 border border-info/30">
-                                                    <p className="text-xs text-muted uppercase tracking-wider">Threshold</p>
-                                                    <p className="text-xl font-bold text-info mt-1">P{Math.round(anomalies.thresholds.percentile * 100)}</p>
+                                                <div style={{ padding: 12, borderRadius: 10, background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)' }}>
+                                                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Threshold</p>
+                                                    <p style={{ fontSize: 20, fontWeight: 700, color: '#818cf8', marginTop: 4 }}>P{Math.round(anomalies.thresholds.percentile * 100)}</p>
                                                 </div>
                                             </div>
 
-                                            <div className="text-xs text-muted">
+                                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>
                                                 MAPE &gt; {anomalies.thresholds.mape.toFixed(1)} or WAPE &gt; {anomalies.thresholds.wape.toFixed(1)}
                                             </div>
 
@@ -713,12 +762,12 @@ export default function AnalystDashboard() {
                                                 {(showAllAnomalies ? anomalies.top_anomalies : anomalies.top_anomalies.slice(0, 3)).length === 0 ? (
                                                     <div className="text-sm text-success">No SKUs exceed anomaly thresholds.</div>
                                                 ) : (showAllAnomalies ? anomalies.top_anomalies : anomalies.top_anomalies.slice(0, 3)).map((item) => (
-                                                    <div key={item.product_id} className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                                    <div key={item.product_id} style={{ padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                                         <div className="flex items-center justify-between gap-2">
                                                             <span className="text-sm font-medium font-mono">{item.product_id}</span>
                                                             <div className="flex items-center gap-2 text-xs">
                                                                 <span className="text-warning">MAPE {item.mape.toFixed(1)}%</span>
-                                                                <span className="text-muted">|</span>
+                                                                <span style={{ color: 'rgba(255,255,255,0.38)' }}>|</span>
                                                                 <span className="text-info">WAPE {item.wape.toFixed(1)}%</span>
                                                             </div>
                                                         </div>
@@ -731,18 +780,16 @@ export default function AnalystDashboard() {
                             </Card>
                         </div>
 
-                        {/* Second Row */}
-                        <div className="grid grid-cols-1 gap-8 mb-8">
-                            {/* Product Accuracy - Full Width */}
+                        {/* Product Accuracy — full width */}
+                        <div>
                             <ProductAccuracyTable />
                         </div>
 
-                        {/* Third Row */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-                            {/* Accuracy Summary - Takes 1 column */}
+                        {/* Third Row — Accuracy Summary + What-If Simulation */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <AccuracySummaryCard />
 
-                            {/* What-If Simulation - Takes 2 columns */}
+                            {/* What-If Simulation */}
                             <div className="lg:col-span-2">
                                 <Card glass>
                                     <CardHeader>
@@ -754,10 +801,16 @@ export default function AnalystDashboard() {
                                                 </CardTitle>
                                                 <CardDescription>Test different demand scenarios</CardDescription>
                                             </div>
-                                            <Button variant="primary" size="sm" onClick={runSimulation} disabled={simulationLoading}>
-                                                <RefreshIcon size={14} className={simulationLoading ? 'animate-spin' : ''} />
+                                            <button
+                                                onClick={runSimulation}
+                                                disabled={simulationLoading}
+                                                style={{ whiteSpace: 'nowrap', height: 36, padding: '0 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', background: simulationLoading ? 'rgba(0,207,255,0.15)' : 'linear-gradient(135deg, #00cfff, #6366f1)', color: '#fff', cursor: simulationLoading ? 'not-allowed' : 'pointer', boxShadow: simulationLoading ? 'none' : '0 0 16px rgba(0,207,255,0.3)', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 6 }}
+                                                onMouseEnter={e => { if (!simulationLoading) { e.currentTarget.style.boxShadow = '0 0 24px rgba(0,207,255,0.5)'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+                                                onMouseLeave={e => { e.currentTarget.style.boxShadow = simulationLoading ? 'none' : '0 0 16px rgba(0,207,255,0.3)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                                            >
+                                                <RefreshIcon size={13} className={simulationLoading ? 'animate-spin' : ''} />
                                                 {simulationLoading ? 'Running...' : 'Run Simulation'}
-                                            </Button>
+                                            </button>
                                         </div>
                                     </CardHeader>
                                     <CardContent>
@@ -771,41 +824,69 @@ export default function AnalystDashboard() {
                                                         onChange={(e) => setCustomScenario(e.target.value)}
                                                         onKeyDown={(e) => e.key === 'Enter' && runCustomScenario()}
                                                         placeholder="e.g. Major snowstorm next week..."
-                                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                                        className="w-full mt-1 rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-[#00cfff] focus:ring-1 focus:ring-[#00cfff] transition-all text-sm flex-1"
                                                         autoFocus
                                                     />
-                                                    <Button variant="primary" size="sm" onClick={runCustomScenario} disabled={simulationLoading}>Analyze</Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => { setShowCustomInput(false); setCustomScenario(''); }}>Cancel</Button>
+                                                    <button
+                                                        onClick={runCustomScenario}
+                                                        disabled={simulationLoading}
+                                                        style={{ whiteSpace: 'nowrap', height: 38, padding: '0 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', background: 'linear-gradient(135deg, #00cfff, #6366f1)', color: '#fff', cursor: 'pointer', transition: 'all 0.2s' }}
+                                                    >
+                                                        Analyze
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setShowCustomInput(false); setCustomScenario(''); }}
+                                                        style={{ whiteSpace: 'nowrap', height: 38, padding: '0 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff', cursor: 'pointer', transition: 'all 0.2s' }}
+                                                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                                                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                                                    >
+                                                        Cancel
+                                                    </button>
                                                 </div>
                                             ) : (
-                                                <div className="p-3 bg-info/10 border border-info/30 rounded-lg flex items-center justify-between">
-                                                    <p className="text-sm text-info flex items-center gap-2">
+                                                <div style={{ padding: 12, background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                    <p style={{ fontSize: 13, color: '#818cf8', display: 'flex', alignItems: 'center', gap: 8 }}>
                                                         <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                                         </svg>
                                                         Use the chat assistant or run a custom AI scenario
                                                     </p>
-                                                    <Button variant="ghost" size="sm" onClick={() => setShowCustomInput(true)}>Custom</Button>
+                                                    <button
+                                                        onClick={() => setShowCustomInput(true)}
+                                                        style={{ height: 30, padding: '0 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff', cursor: 'pointer', transition: 'all 0.2s' }}
+                                                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                                                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                                                    >
+                                                        Custom
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Results */}
+                                        {/* Simulation Results */}
                                         {simulationResults.length === 0 ? (
-                                            <div className="text-center py-8 text-muted">
+                                            <div className="text-center py-8" style={{ color: 'rgba(255,255,255,0.38)' }}>
                                                 <RefreshIcon size={32} className="mx-auto mb-2 opacity-30" />
-                                                <p className="text-sm">Click <span className="text-foreground font-medium">Run Simulation</span> to load live scenarios from the database</p>
+                                                <p className="text-sm">Click <span style={{ color: '#e8e8f0', fontWeight: 500 }}>Run Simulation</span> to load live scenarios from the database</p>
                                             </div>
                                         ) : (
                                             <div className="space-y-3">
                                                 {simulationResults.map((sim: any, idx: number) => (
-                                                    <div key={idx} className={`p-4 rounded-lg border ${sim.ai_reasoning ? 'bg-primary/5 border-primary/30' : 'bg-white/5 border-white/5'}`}>
+                                                    <div
+                                                        key={idx}
+                                                        style={{
+                                                            padding: 16,
+                                                            borderRadius: 10,
+                                                            background: sim.ai_reasoning ? 'rgba(0,207,255,0.04)' : 'rgba(255,255,255,0.03)',
+                                                            border: sim.ai_reasoning ? '1px solid rgba(0,207,255,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                                                        }}
+                                                    >
                                                         <div className="flex items-start justify-between mb-2">
                                                             <div className="flex-1">
                                                                 <div className="flex items-center gap-2">
                                                                     <div className="font-medium text-sm">{sim.scenario}</div>
                                                                     {sim.ai_reasoning && (
-                                                                        <span className="px-2 py-0.5 bg-primary/20 text-primary text-xs rounded-full">AI</span>
+                                                                        <span style={{ padding: '2px 8px', background: 'rgba(0,207,255,0.15)', color: '#00cfff', fontSize: 10, borderRadius: 20, fontWeight: 700 }}>AI</span>
                                                                     )}
                                                                 </div>
                                                                 {sim.ai_reasoning && (
@@ -828,21 +909,21 @@ export default function AnalystDashboard() {
                         </div>
                     </>
                 )}
+            </div>
 
-                {/* LLM Assistant Floating Button */}
-                <div className="fixed bottom-6 right-6 z-40">
-                    <button
-                        onClick={() => setIsChatOpen(!isChatOpen)}
-                        className="w-14 h-14 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-full shadow-lg shadow-info/30 flex items-center justify-center hover:scale-110 transition-transform group"
-                    >
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                    </button>
-                    <div className="absolute -top-10 right-0 bg-surface-elevated text-xs px-3 py-1.5 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10">
-                        💬 Ask AI Assistant
-                    </div>
-                </div>
+            {/* Chat FAB — updated to match design system */}
+            <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 40 }}>
+                <button
+                    onClick={() => setIsChatOpen(!isChatOpen)}
+                    style={{ width: 52, height: 52, background: 'linear-gradient(135deg, #00cfff, #6366f1)', borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(0,207,255,0.4)', transition: 'all 0.2s' }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 0 32px rgba(0,207,255,0.6)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 0 24px rgba(0,207,255,0.4)'; }}
+                    title="Ask AI Assistant"
+                >
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                </button>
             </div>
 
             {/* Chat Panel */}
@@ -852,7 +933,7 @@ export default function AnalystDashboard() {
                 onScenarioAnalyzed={handleChatScenario}
             />
 
-            {/* Toast Notification */}
+            {/* Toast */}
             {notification && (
                 <Toast
                     message={notification.message}
@@ -860,6 +941,6 @@ export default function AnalystDashboard() {
                     onClose={() => setNotification(null)}
                 />
             )}
-        </div >
+        </div>
     );
 }
