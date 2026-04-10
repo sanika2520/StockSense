@@ -1,7 +1,7 @@
+
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import Button from './Button';
 import { XIcon } from './Icons';
 
 interface Message {
@@ -90,7 +90,6 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
                 });
                 if (response.ok) {
                     const data = await response.json();
-                    // Convert to simple name mapping
                     const nameMap: Record<string, string> = {};
                     Object.keys(data).forEach(key => {
                         nameMap[key] = data[key].name;
@@ -99,7 +98,6 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
                 }
             } catch (error) {
                 console.error('Error fetching categories:', error);
-                // Fallback to basic names
                 setCategories({
                     "FRPR": "Fresh Produce",
                     "BKDY": "Bakery",
@@ -155,18 +153,15 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
         setInput('');
         setIsTyping(true);
 
-        // Analyze the scenario
         const result = await analyzeScenario(input);
 
         let responseText = '';
         
         if (result && !result.error) {
-            // Notify parent component
             if (onScenarioAnalyzed) {
                 onScenarioAnalyzed(result);
             }
 
-            // Create conversational response
             const baselineDemand = result.baseline_demand_used || baseline || result.demand;
             const demandChange = typeof result.multiplier_used === 'number'
                 ? (result.multiplier_used - 1) * 100
@@ -186,10 +181,8 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
                 responseText += `💡 **Why**: ${result.ai_reasoning}\n\n`;
             }
             
-            // Show category-specific impacts if available
             if (result.affected_categories && result.affected_categories.length > 0) {
                 responseText += `🎯 **Affected Categories**:\n`;
-                
                 result.affected_categories.forEach((cat: string) => {
                     const impact = result.category_impacts?.[cat];
                     const change = impact ? ((impact - 1) * 100).toFixed(0) : "0";
@@ -202,7 +195,6 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
                 responseText += `🌐 **Impact**: Affects all product categories\n\n`;
             }
             
-            // Show top product-level propagation impacts from GNN
             if (result.affected_products && Object.keys(result.affected_products).length > 0) {
                 const productList = Object.entries(result.affected_products)
                     .map(([sku, mult]: [string, any]) => ({
@@ -215,7 +207,7 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
                         })()
                     }))
                     .sort((a, b) => Math.abs(b.mult - 1) - Math.abs(a.mult - 1))
-                    .slice(0, 8);  // Show top 8 most affected products
+                    .slice(0, 8);
                 
                 if (productList.length > 0) {
                     responseText += `🔗 **GNN Propagated Impacts** (Product Level):\n`;
@@ -267,7 +259,11 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
     if (!isOpen) return null;
 
     return (
-        <div className="fixed bottom-6 right-6 w-96 h-[600px] glass border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 animate-in slide-in-from-bottom-4 duration-300">
+        // FIX 3: top-16 (64px) pushes panel below navbar; height fills remaining viewport
+        <div
+            className="fixed right-6 w-96 glass border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 animate-in slide-in-from-bottom-4 duration-300"
+            style={{ top: 72, height: 'calc(100vh - 72px - 24px)' }}
+        >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/10">
                 <div>
@@ -292,9 +288,11 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
                         <div
                             className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                                 msg.role === 'user'
-                                    ? 'bg-gradient-to-r from-primary to-info text-white'
+                                    ? 'text-white'
                                     : 'bg-surface-elevated border border-white/10'
                             }`}
+                            // FIX 2: user bubble uses cyan-to-indigo gradient
+                            style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #00cfff, #6366f1)' } : {}}
                         >
                             <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
                             <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white/70' : 'text-muted'}`}>
@@ -322,6 +320,7 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
             {/* Input */}
             <div className="p-4 border-t border-white/10">
                 <div className="flex gap-2">
+                    {/* FIX 1: explicit text color so typed text is visible */}
                     <input
                         type="text"
                         value={input}
@@ -329,15 +328,31 @@ export default function ChatPanel({ isOpen, onClose, onScenarioAnalyzed }: ChatP
                         onKeyPress={handleKeyPress}
                         placeholder="Describe a scenario..."
                         className="flex-1 bg-surface-elevated border border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                        style={{ color: '#000000' }}
                         disabled={isTyping}
                     />
-                    <Button
-                        variant="primary"
+                    {/* FIX 2: Send button cyan-to-indigo gradient */}
+                    <button
                         onClick={handleSend}
                         disabled={!input.trim() || isTyping}
+                        style={{
+                            padding: '0 18px',
+                            borderRadius: 8,
+                            fontSize: 13,
+                            fontWeight: 700,
+                            border: 'none',
+                            background: (!input.trim() || isTyping)
+                                ? 'rgba(0,207,255,0.2)'
+                                : 'linear-gradient(135deg, #00cfff, #6366f1)',
+                            color: '#fff',
+                            cursor: (!input.trim() || isTyping) ? 'not-allowed' : 'pointer',
+                            boxShadow: (!input.trim() || isTyping) ? 'none' : '0 0 16px rgba(0,207,255,0.3)',
+                            transition: 'all 0.2s',
+                            whiteSpace: 'nowrap',
+                        }}
                     >
                         Send
-                    </Button>
+                    </button>
                 </div>
                 <p className="text-xs text-muted mt-2">
                     💬 Ask about weather, competitors, holidays, economy, etc.

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -486,7 +485,7 @@ export default function AnalystDashboard() {
             </nav>
 
             {/* Page content */}
-            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '2rem 2rem' }} className="space-y-6">
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '2rem 2rem', paddingRight: isChatOpen ? '440px' : '2rem', transition: 'padding-right 0.3s ease' }} className="space-y-6">
 
                 {/* Page Header */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4" style={{ marginBottom: 8 }}>
@@ -912,7 +911,7 @@ export default function AnalystDashboard() {
             </div>
 
             {/* Chat FAB — updated to match design system */}
-            <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 40 }}>
+            <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 40, opacity: isChatOpen ? 0 : 1, pointerEvents: isChatOpen ? 'none' : 'auto', transition: 'opacity 0.2s ease' }}>
                 <button
                     onClick={() => setIsChatOpen(!isChatOpen)}
                     style={{ width: 52, height: 52, background: 'linear-gradient(135deg, #00cfff, #6366f1)', borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(0,207,255,0.4)', transition: 'all 0.2s' }}
@@ -931,6 +930,7 @@ export default function AnalystDashboard() {
                 isOpen={isChatOpen}
                 onClose={() => setIsChatOpen(false)}
                 onScenarioAnalyzed={handleChatScenario}
+                style={{ zIndex: 60 }}
             />
 
             {/* Toast */}
