@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 
@@ -56,6 +56,10 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSku, setSelectedSku] = useState('');
   const [manualQty, setManualQty] = useState('');
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [isSkuOpen, setIsSkuOpen] = useState(false);
+  const categoryRef = useRef<HTMLDivElement>(null);
+  const skuRef = useRef<HTMLDivElement>(null);
 
   const normalizedForecasts = useMemo(() => {
     const bySku = new Map<string, ForecastOption>();
@@ -97,6 +101,15 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
     setSelectedSku('');
     setManualQty('');
   }, [selectedCategory]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryRef.current && !categoryRef.current.contains(e.target as Node)) setIsCategoryOpen(false);
+      if (skuRef.current && !skuRef.current.contains(e.target as Node)) setIsSkuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!selectedSku) return;
@@ -168,43 +181,55 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
           <div className="mb-8">
             <label className="text-sm text-muted mb-3 block">Or Add by Category and SKU</label>
             <div className="flex gap-2 flex-wrap">
-              <select
-                className="flex-1 min-w-32 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-foreground"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-              >
-                <option value="">Select category</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+              {/* Category custom dropdown */}
+              <div ref={categoryRef} style={{ position: 'relative', flex: 1, minWidth: 128 }}>
+                <button
+                  type="button"
+                  onClick={() => { setIsCategoryOpen(o => !o); setIsSkuOpen(false); }}
+                  style={{ width: '100%', padding: '8px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: selectedCategory ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCategory || 'Select category'}</span>
+                  <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 8, flexShrink: 0, transform: isCategoryOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+                </button>
+                {isCategoryOpen && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#0d0d1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, zIndex: 10000, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+                    <div onClick={() => { setSelectedCategory(''); setIsCategoryOpen(false); }} style={{ padding: '8px 12px', fontSize: 13, color: 'rgba(255,255,255,0.35)', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Select category</div>
+                    {categories.map(cat => (
+                      <div key={cat} onClick={() => { setSelectedCategory(cat); setIsCategoryOpen(false); }} style={{ padding: '8px 12px', fontSize: 13, color: selectedCategory === cat ? '#00cfff' : '#fff', background: selectedCategory === cat ? 'rgba(0,207,255,0.08)' : 'transparent', cursor: 'pointer' }} onMouseEnter={e => { if (selectedCategory !== cat) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }} onMouseLeave={e => { if (selectedCategory !== cat) e.currentTarget.style.background = 'transparent'; }}>{cat}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-              <select
-                className="flex-1 min-w-32 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-foreground disabled:opacity-50"
-                value={selectedSku}
-                onChange={(e) => setSelectedSku(e.target.value)}
-                disabled={!selectedCategory}
-              >
-                <option value="">Select SKU</option>
-                {skuOptions.map((item) => (
-                  <option key={item.sku} value={item.sku}>
-                    {item.sku} - {item.product_name}
-                  </option>
-                ))}
-              </select>
+              {/* SKU custom dropdown */}
+              <div ref={skuRef} style={{ position: 'relative', flex: 1, minWidth: 128, opacity: !selectedCategory ? 0.45 : 1, pointerEvents: !selectedCategory ? 'none' : 'auto' }}>
+                <button
+                  type="button"
+                  onClick={() => { setIsSkuOpen(o => !o); setIsCategoryOpen(false); }}
+                  style={{ width: '100%', padding: '8px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: selectedSku ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedSku ? (skuOptions.find(s => s.sku === selectedSku)?.product_name || selectedSku) : 'Select SKU'}</span>
+                  <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 8, flexShrink: 0, transform: isSkuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+                </button>
+                {isSkuOpen && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#0d0d1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, zIndex: 10000, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+                    <div onClick={() => { setSelectedSku(''); setIsSkuOpen(false); }} style={{ padding: '8px 12px', fontSize: 13, color: 'rgba(255,255,255,0.35)', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Select SKU</div>
+                    {skuOptions.map(item => (
+                      <div key={item.sku} onClick={() => { setSelectedSku(item.sku); setIsSkuOpen(false); }} style={{ padding: '8px 12px', fontSize: 13, color: selectedSku === item.sku ? '#00cfff' : '#fff', background: selectedSku === item.sku ? 'rgba(0,207,255,0.08)' : 'transparent', cursor: 'pointer' }} onMouseEnter={e => { if (selectedSku !== item.sku) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }} onMouseLeave={e => { if (selectedSku !== item.sku) e.currentTarget.style.background = 'transparent'; }}>{item.sku} — {item.product_name}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <Input
                 type="number"
-                placeholder="Quantity"
+                placeholder="Qty"
                 className="w-24"
                 value={manualQty}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualQty(e.target.value)}
               />
 
-              <Button
-                variant="primary"
+              <button
                 onClick={() => {
                   const qty = parseFloat(manualQty);
                   const selected = normalizedForecasts.find((f) => f.sku === selectedSku);
@@ -230,9 +255,25 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
                     alert('Please select category, SKU, and valid quantity');
                   }
                 }}
+                style={{
+                  height: 38,
+                  padding: '0 20px',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #00cfff, #6366f1)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  boxShadow: '0 0 14px rgba(0,207,255,0.25)',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 22px rgba(0,207,255,0.4)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 14px rgba(0,207,255,0.25)'; e.currentTarget.style.transform = 'translateY(0)'; }}
               >
                 Add
-              </Button>
+              </button>
             </div>
           </div>
 
@@ -253,7 +294,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs text-muted block mb-2">Quantity</label>
+                        <label className="text-xs text-muted block mb-2">Qty</label>
                         <Input
                           type="number"
                           value={item.quantity_requested}
@@ -275,7 +316,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
                             newItems[idx].unit_price = parseFloat(e.target.value) || null;
                             setPOItems(newItems);
                           }}
-                          placeholder="$0.00"
+                          placeholder="Rs0.00"
                         />
                       </div>
                     </div>

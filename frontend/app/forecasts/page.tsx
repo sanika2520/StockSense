@@ -1,7 +1,114 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
+
+/* ─── Custom dropdown that always opens downward ─────────────────────────── */
+interface SelectOption { value: string | number; label: string }
+interface CustomSelectProps {
+    value: string | number;
+    onChange: (v: string) => void;
+    options: SelectOption[];
+    style?: React.CSSProperties;
+}
+
+function CustomSelect({ value, onChange, options, style }: CustomSelectProps) {
+    const [open, setOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 0 });
+    const ref = useRef<HTMLDivElement>(null);
+    const selectedLabel = options.find(o => String(o.value) === String(value))?.label ?? '';
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const base: React.CSSProperties = {
+        width: '100%',
+        background: 'rgba(255,255,255,0.05)',
+        color: '#fff',
+        border: open ? '1px solid #00cfff' : '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 8,
+        padding: '8px 32px 8px 12px',
+        fontSize: 13,
+        outline: 'none',
+        transition: 'border 0.2s',
+        cursor: 'pointer',
+        userSelect: 'none',
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        ...style,
+    };
+
+    return (
+        <div ref={ref} style={{ position: 'relative', width: '100%' }}>
+            {/* Trigger */}
+            <div style={base} onClick={() => {
+  if (!open && ref.current) {
+    const rect = ref.current.getBoundingClientRect();
+    setMenuPos({
+      top: rect.bottom + window.scrollY + 4,
+      left: rect.left + window.scrollX,
+      width: rect.width,
+    });
+  }
+  setOpen(o => !o);
+}}>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {selectedLabel}
+                </span>
+                <span style={{
+                    position: 'absolute', right: 10, top: '50%', transform: open ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
+                    transition: 'transform 0.2s', pointerEvents: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 11,
+                }}>▼</span>
+            </div>
+
+            {/* Menu — always opens downward via portal */}
+            {open && createPortal(
+                <div style={{
+                    position: 'fixed',
+                    top: menuPos.top,
+                    left: menuPos.left,
+                    width: menuPos.width,
+                    background: '#0a0a14',
+                    border: '1px solid rgba(0,207,255,0.25)',
+                    borderRadius: 8,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                    zIndex: 99999,
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                }}>
+                    {options.map(opt => (
+                        <div
+                            key={opt.value}
+                            onClick={() => { onChange(String(opt.value)); setOpen(false); }}
+                            style={{
+                                padding: '9px 14px',
+                                fontSize: 13,
+                                cursor: 'pointer',
+                                color: String(opt.value) === String(value) ? '#00cfff' : '#e8e8f0',
+                                background: String(opt.value) === String(value) ? 'rgba(0,207,255,0.08)' : 'transparent',
+                                transition: 'background 0.15s',
+                            }}
+                            onMouseEnter={e => { if (String(opt.value) !== String(value)) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
+                            onMouseLeave={e => { if (String(opt.value) !== String(value)) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                        >
+                            {opt.label}
+                        </div>
+                    ))}
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+}
+/* ─────────────────────────────────────────────────────────────────────────── */
 import Card, { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -12,7 +119,7 @@ import {
     SearchIcon,
     RefreshIcon,
 } from '@/components/ui/Icons';
-import InsightAssistant from '@/components/features/InsightAssistant';
+//import InsightAssistant from '@/components/features/InsightAssistant';
 
 interface User {
     id?: number;
@@ -318,87 +425,64 @@ export default function ForecastsPage() {
                 </div>
 
                 {/* Filters */}
-                <div style={{ background: 'rgba(6,6,16,0.6)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24, marginBottom: 32 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16 }}>
+                <div style={{ background: 'rgba(6,6,16,0.6)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24, marginBottom: 32,  overflow: 'visible', isolation: 'isolate' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16, alignItems: 'flex-start' }}>
                         <div>
                             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Category</label>
-                            <select
+                            <CustomSelect
                                 value={selectedCategory}
-                                onChange={(e) => {
-                                    setSelectedCategory(e.target.value);
-                                    setSelectedProduct('');
-                                }}
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
-                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
-                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
-                            >
-                                <option value="" style={{ background: '#0d0d1a' }}>All Categories</option>
-                                {categories.map(cat => (
-                                    <option key={cat.code} value={cat.code} style={{ background: '#0d0d1a' }}>
-                                        {cat.name} ({cat.product_count})
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(v) => { setSelectedCategory(v); setSelectedProduct(''); }}
+                                options={[
+                                    { value: '', label: 'All Categories' },
+                                    ...categories.map(cat => ({ value: cat.code, label: `${cat.name} (${cat.product_count})` })),
+                                ]}
+                            />
                         </div>
                         <div style={{ gridColumn: 'span 2' }}>
                             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Product</label>
-                            <select
+                            <CustomSelect
                                 value={selectedProduct}
-                                onChange={(e) => setSelectedProduct(e.target.value)}
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
-                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
-                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
-                            >
-                                {products.map(prod => (
-                                    <option key={prod.sku} value={prod.sku} style={{ background: '#0d0d1a' }}>
-                                        {prod.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={setSelectedProduct}
+                                options={products.map(prod => ({ value: prod.sku, label: prod.name }))}
+                            />
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Store</label>
-                            <select
+                            <CustomSelect
                                 value={selectedStore}
-                                onChange={(e) => setSelectedStore(e.target.value)}
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
-                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
-                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
-                            >
-                                <option value="S1" style={{ background: '#0d0d1a' }}>Store S1</option>
-                                <option value="S2" style={{ background: '#0d0d1a' }}>Store S2</option>
-                                <option value="S3" style={{ background: '#0d0d1a' }}>Store S3</option>
-                            </select>
+                                onChange={setSelectedStore}
+                                options={[
+                                    { value: 'S1', label: 'Store S1' },
+                                    { value: 'S2', label: 'Store S2' },
+                                    { value: 'S3', label: 'Store S3' },
+                                ]}
+                            />
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>History</label>
-                            <select
+                            <CustomSelect
                                 value={historyDays}
-                                onChange={(e) => setHistoryDays(Number(e.target.value))}
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
-                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
-                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
-                            >
-                                <option value={7} style={{ background: '#0d0d1a' }}>7 days</option>
-                                <option value={14} style={{ background: '#0d0d1a' }}>14 days</option>
-                                <option value={30} style={{ background: '#0d0d1a' }}>30 days</option>
-                                <option value={60} style={{ background: '#0d0d1a' }}>60 days</option>
-                                <option value={90} style={{ background: '#0d0d1a' }}>90 days</option>
-                            </select>
+                                onChange={(v) => setHistoryDays(Number(v))}
+                                options={[
+                                    { value: 7, label: '7 days' },
+                                    { value: 14, label: '14 days' },
+                                    { value: 30, label: '30 days' },
+                                    { value: 60, label: '60 days' },
+                                    { value: 90, label: '90 days' },
+                                ]}
+                            />
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Forecast</label>
-                            <select
+                            <CustomSelect
                                 value={forecastDays}
-                                onChange={(e) => setForecastDays(Number(e.target.value))}
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', transition: 'all 0.2s' }}
-                                onFocus={(e) => e.currentTarget.style.border = '1px solid #00cfff'}
-                                onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'}
-                            >
-                                <option value={7} style={{ background: '#0d0d1a' }}>7 days</option>
-                                <option value={14} style={{ background: '#0d0d1a' }}>14 days</option>
-                                <option value={30} style={{ background: '#0d0d1a' }}>30 days</option>
-                            </select>
+                                onChange={(v) => setForecastDays(Number(v))}
+                                options={[
+                                    { value: 7, label: '7 days' },
+                                    { value: 14, label: '14 days' },
+                                    { value: 30, label: '30 days' },
+                                ]}
+                            />
                         </div>
                     </div>
                 </div>
@@ -648,8 +732,7 @@ export default function ForecastsPage() {
                     </div>
                 </div>
 
-                {/* LLM Assistant */}
-                <InsightAssistant productDetail={productDetail} onDrawerChange={setDrawerOpen} />
+                
             </div>
         </div>
     );

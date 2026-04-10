@@ -390,7 +390,7 @@ export default function AnalystDashboard() {
     const tabs = [
         { key: 'overview', label: 'Overview' },
         { key: 'analysis', label: 'Analysis' },
-        { key: 'forecasts', label: 'Forecasts' },
+        //{ key: 'forecasts', label: 'Forecasts' },
         { key: 'gnn', label: 'GNN Insights' },
     ];
 
@@ -577,7 +577,7 @@ export default function AnalystDashboard() {
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div>
                                         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Active Model</p>
-                                        <h3 style={{ fontSize: 22, fontWeight: 700, marginTop: 4, color: '#818cf8' }}>
+                                        <h3 style={{ fontSize: 22, fontWeight: 700, marginTop: 4, color: '#fff' }}>
                                             {modelMetrics.find(m => m.status === 'active')?.model.split(' ')[0] || 'TFT'}
                                         </h3>
                                         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>
@@ -597,7 +597,7 @@ export default function AnalystDashboard() {
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div>
                                         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Avg. MAPE</p>
-                                        <h3 style={{ fontSize: 26, fontWeight: 700, marginTop: 4, color: '#34d399' }}>
+                                        <h3 style={{ fontSize: 26, fontWeight: 700, marginTop: 4, color: '#fff' }}>
                                             {modelMetrics.find(m => m.status === 'active')?.mape.toFixed(1) || '8.5'}%
                                         </h3>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
@@ -626,7 +626,7 @@ export default function AnalystDashboard() {
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div>
                                         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>High-Risk Stockouts</p>
-                                        <h3 style={{ fontSize: 26, fontWeight: 700, marginTop: 4, color: '#fbbf24' }}>
+                                        <h3 style={{ fontSize: 26, fontWeight: 700, marginTop: 4, color: '#fff' }}>
                                             {stockoutCount === null ? '—' : stockoutCount}
                                         </h3>
                                         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>

@@ -477,7 +477,7 @@ export default function ManagerDashboard() {
                                 <h3 style={{ fontSize:28, fontWeight:800, color:'#fbbf24', margin:'8px 0 4px 0', letterSpacing:'-0.02em' }}>{summary?.low_stock_count || 0}</h3>
                                 <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)' }}>From ML predictions</p>
                             </div>
-                            <div style={{ width:40, height:40, borderRadius:12, background:'rgba(251,191,36,0.12)', border:'1px solid rgba(251,191,36,0.2)', color:'#fbbf24', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            <div style={{ width:40, height:40, borderRadius:12, background:'rgba(251,191,36,0.12)', border:'1px solid rgba(251,191,36,0.2)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
                                 <AlertIcon size={20} />
                             </div>
                         </div>
